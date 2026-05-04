@@ -222,18 +222,16 @@ public class BillService {
         // ── 2. Find Accounts Payable CoA account (LIABILITIES) ───────────────
         //    This is the DEBIT side — we are clearing the liability
         Coa apAccount = coaRepository
-                .findFirstByTenantIdAndAccountTypeAndIsDeletedFalse(tenantId, AccountType.LIABILITIES)
+                .findByIdAndTenantIdAndIsDeletedFalse(request.apAccountId(), tenantId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "No Accounts Payable (LIABILITIES) account found. " +
-                                "Please create one in Chart of Accounts first."));
+                        "Accounts Payable account not found with id: " + request.apAccountId()));
 
         // ── 3. Find Cash CoA account (ASSETS) ────────────────────────────────
         //    This is the CREDIT side — cash leaves the bank account
         Coa cashAccount = coaRepository
-                .findFirstByTenantIdAndAccountTypeAndIsDeletedFalse(tenantId, AccountType.ASSETS)
+                .findByIdAndTenantIdAndIsDeletedFalse(request.cashAccountId(), tenantId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        "No Cash (ASSETS) account found. " +
-                                "Please create one in Chart of Accounts first."));
+                        "Cash account not found with id: " + request.cashAccountId()));
 
         // ── 4. Build balanced journal entry ───────────────────────────────────
         List<JournalLineRequest> lines = List.of(
