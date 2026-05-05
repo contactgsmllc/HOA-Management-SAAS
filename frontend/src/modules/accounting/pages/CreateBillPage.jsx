@@ -65,10 +65,6 @@ export default function CreateBillPage() {
 
         const coaList = cRes.data?.content || cRes.data?.data || (Array.isArray(cRes.data) ? cRes.data : []);
         setCoaOptions(coaList.map(c => ({ value: String(c.id), label: `${c.accountCode} - ${c.accountName}` })));
-
-        if (!isEdit) {
-          setFormData(prev => ({ ...prev, billNumber: `BILL-${Math.floor(100000 + Math.random() * 900000)}` }));
-        }
       } catch (err) {
         toast.error("Error loading form dependencies");
       }
@@ -148,7 +144,6 @@ const handleSubmit = async (e) => {
    setLoading(true);
    try {
     const payload = {
-      billNumber: formData.billNumber,
       vendorId: Number(formData.vendorId),
       associationId: Number(formData.associationId),
       issueDate: formData.issueDate,
@@ -224,7 +219,7 @@ const handleSubmit = async (e) => {
               label="Bill Number"
               name="billNumber"
               required
-              value={formData.billNumber}
+             value={isEdit ? formData.billNumber : "Auto-Generated"}
               disabled
             />
             <Input label="Issue Date" name="issueDate" type="date" required value={formData.issueDate} onChange={handleInputChange} />

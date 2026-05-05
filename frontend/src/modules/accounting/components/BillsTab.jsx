@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getBills, getBillsSummary, payBill, getVendors } from "../api/accountingApi";
+import { getBills, getBillsSummary, payBill, getVendors , getBankAccounts } from "../api/accountingApi";
 import { getAssociations } from "@/modules/associations/associationApi";
 import dayjs from "dayjs";
-import { Plus } from "lucide-react";
+import { Plus , X } from "lucide-react";
 // UI Components
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -67,7 +67,60 @@ export default function BillsTab() {
   const [fromDate, setFromDate]         = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate]             = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
 
-  const handleDateChange = (value) => {
+// pay logic
+
+const [showPayModal, setShowPayModal] = useState(false);
+const [selectedBill, setSelectedBill] = useState(null);
+const [bankAccounts, setBankAccounts] = useState([]);
+const [paymentData, setPaymentData] = useState({
+  bankAccountId: "",
+  paymentDate: dayjs().format("YYYY-MM-DD"),
+});
+
+const fetchBanks = async (associationId) => {
+  try {
+    const res = await getBankAccounts(associationId);
+  const accounts = res.data?.data || res.data?.content || res.data || [];
+    setBankAccounts(accounts);
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to load bank accounts");
+  }
+};
+const openPayModal = (bill) => {
+  setSelectedBill(bill);
+  const assocId = bill.associationId || bill.association?.id; 
+  fetchBanks(assocId); 
+  setShowPayModal(true);
+};
+
+const handleFinalPay = async () => {
+  if (!paymentData.bankAccountId) {
+    toast.error("Please select a bank account");
+    return;
+  }
+
+  setPayingId(selectedBill.id);
+  try {
+    const payload = {
+      bankAccountId: Number(paymentData.bankAccountId),
+      paymentDate: paymentData.paymentDate,
+      apAccountId: selectedBill.lineItems?.[0]?.expenseAccountId, 
+      cashAccountId: Number(paymentData.bankAccountId) 
+    };
+
+    await payBill(selectedBill.id, payload);
+    toast.success(`Bill ${selectedBill.billNumber} paid successfully`);
+    setShowPayModal(false);
+    fetchData(); 
+  } catch (err) {
+    toast.error(err.response?.data?.error || "Payment failed");
+  } finally {
+    setPayingId(null);
+  }
+};
+// date funtion
+const handleDateChange = (value) => {
     setDateRange(value);
     let start = dayjs();
     let end = dayjs();
@@ -267,7 +320,7 @@ export default function BillsTab() {
                         <Button 
                           variant="primary" 
                           size="sm" 
-                          onClick={() => handlePay(bill)} 
+                          onClick={() => openPayModal(bill)} 
                           loading={payingId === bill.id}
                         >
                           Pay
@@ -281,6 +334,62 @@ export default function BillsTab() {
           </tbody>
         </table>
       </div>
+    {showPayModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <Card className="w-full max-w-md shadow-xl border-none">
+      <div className="flex justify-between items-center p-4 border-b">
+        <h3 className="font-bold text-gray-900">Record Payment</h3>
+        <button onClick={() => setShowPayModal(false)}><X size={20} /></button>
+      </div>
+
+      <div className="p-6 space-y-4">
+        <div className="text-sm bg-gray-50 p-3 rounded-lg border">
+          <div className="flex justify-between mb-1">
+            <span className="text-gray-500">Bill Number:</span>
+            <span className="font-semibold">{selectedBill?.billNumber}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Total Amount:</span>
+            <span className="font-semibold text-blue-700">{fmtCurrency(selectedBill?.totalAmount)}</span>
+          </div>
+        </div>
+
+        <Select
+          label="Payment Account (Bank/Cash)"
+          required
+          value={paymentData.bankAccountId}
+          onChange={(e) => setPaymentData({ ...paymentData, bankAccountId: e.target.value })}
+          options={[
+            { value: "", label: "-- Select Account --" },
+            ...bankAccounts.map(bank => ({ 
+              value: String(bank.id), 
+              label: bank.accountName || bank.name || `Account ${bank.id}`
+            }))
+          ]}
+        />
+
+        <Input
+          label="Payment Date"
+          type="date"
+          value={paymentData.paymentDate}
+          onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
+        />
+      </div>
+
+      <div className="p-4 bg-gray-50 flex gap-3 justify-end rounded-b-xl">
+        <Button variant="outline" onClick={() => setShowPayModal(false)}>Cancel</Button>
+        <Button 
+          variant="primary" 
+          onClick={handleFinalPay} 
+          loading={payingId === selectedBill?.id}
+        >
+          Confirm Payment
+        </Button>
+      </div>
+    </Card>
+  </div>
+)}
+
     </div>
   );
 }
