@@ -87,6 +87,15 @@ public class VendorController {
         vendorService.deleteVendor(id);
         return ResponseEntity.noContent().build();
     }
+    @Operation(
+            summary = "Batch delete vendors",
+            description = "Deletes multiple vendors by their IDs. Only vendors belonging to the current tenant will be deleted."
+    )
+    @DeleteMapping("/batch")
+    public ResponseEntity<Void> deleteBatch(@RequestBody List<Long> ids) {
+        vendorService.deleteBatch(ids);
+        return ResponseEntity.noContent().build();
+    }
 
 }
 
