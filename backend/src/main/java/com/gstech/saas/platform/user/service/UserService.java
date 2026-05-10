@@ -9,6 +9,7 @@ import com.gstech.saas.platform.user.repository.RefreshTokenRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseCookie;
@@ -29,16 +30,19 @@ import lombok.RequiredArgsConstructor;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
 
     private final UserRepository repo;
     private final JwtTokenProvider jwtTokenProvider;
@@ -259,7 +263,7 @@ public class UserService {
         passwordResetTokenRepository.save(resetToken);
 
         String resetLink =
-                "http://localhost:3000/reset-password?token=" + rawToken;
+                frontendBaseUrl + "/reset-password?token=" + rawToken;
 
         // Send email with temp password
         mailService.sendInviteEmail(
@@ -358,7 +362,7 @@ public class UserService {
 
         StringBuilder password = new StringBuilder();
 
-        Random random = new Random();
+        SecureRandom random = new SecureRandom();
 
         for (int i = 0; i < 8; i++) {
             password.append(chars.charAt(random.nextInt(chars.length())));
