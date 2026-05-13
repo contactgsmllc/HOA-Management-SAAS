@@ -16,4 +16,6 @@ public interface VendorRepository extends JpaRepository<Vendor, Long> {
     Optional<Vendor> findByIdAndTenantId(Long id, Long tenantId);
 
     boolean existsByTenantIdAndEmail(Long tenantId, String email);
+
+    void deleteAllByIdInAndTenantId(List<Long> ids, Long tenantId);
 }

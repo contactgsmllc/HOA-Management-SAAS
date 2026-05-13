@@ -7,9 +7,12 @@ import com.gstech.saas.associations.vendor.repository.VendorRepository;
 import com.gstech.saas.platform.tenant.multitenancy.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VendorServiceImpl implements VendorService {
@@ -95,6 +98,23 @@ public class VendorServiceImpl implements VendorService {
     public void deleteVendor(Long id) {
 
         vendorRepository.delete(findOrThrow(id));
+    }
+    @Override
+    @Transactional
+    public void deleteBatch(List<Long> ids) {
+        Long tenantId = TenantContext.get();
+
+        List<Vendor> vendors = vendorRepository.findAllById(ids)
+                .stream()
+                .filter(v -> v.getTenantId().equals(tenantId))  // security: only delete own tenant's vendors
+                .toList();
+
+        if (vendors.isEmpty()) {
+            throw new EntityNotFoundException("No vendors found for the given ids");
+        }
+
+        vendorRepository.deleteAll(vendors);
+        log.info("Batch deleted {} vendors for tenantId={}", vendors.size(), tenantId);
     }
 
     private Vendor getVendorEntity(Long id) {

@@ -3,6 +3,8 @@ package com.gstech.saas.associations.vendor.service;
 import com.gstech.saas.associations.vendor.dtos.VendorRequest;
 import com.gstech.saas.associations.vendor.dtos.VendorResponse;
 
+import java.util.List;
+
 public interface VendorService {
 
     VendorResponse createVendor(VendorRequest request);
@@ -12,4 +14,6 @@ public interface VendorService {
     VendorResponse getVendorById(Long id);
 
     void deleteVendor(Long id);
+
+    void deleteBatch(List<Long> ids);
 }
