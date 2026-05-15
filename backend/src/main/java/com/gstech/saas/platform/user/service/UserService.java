@@ -69,7 +69,8 @@ public class UserService {
         user.setEmail(req.email());
         user.setName(req.name());
         user.setPassword(encoder.encode(req.password()));
-        user.setRole(Role.TENANT_ADMIN); // default role
+        Role role = req.role() != null ? req.role() : Role.TENANT_ADMIN;
+        user.setRole(role);
         user.setStatus(UserStatus.ACTIVE); // default status
         user.setTenantId(tenantId); // IMPORTANT
 
