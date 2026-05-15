@@ -311,6 +311,22 @@ public class UserService {
         passwordResetTokenRepository.save(token);
     }
 
+    public List<RoleResponse> getRoles() {
+
+        Long tenantId = TenantContext.get();
+
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not resolved");
+        }
+
+        return List.of(
+                buildRoleResponse(Role.TENANT_ADMIN, "Full Access", tenantId),
+                buildRoleResponse(Role.MANAGER, "Read/Write", tenantId),
+                buildRoleResponse(Role.VIEWER, "Read Only", tenantId)
+        );
+    }
+
+
     private String issueRefreshTokenCookie(Long userId, Long tenantId, HttpServletResponse response) {
 
         UUID tokenId = UUID.randomUUID();
@@ -355,6 +371,11 @@ public class UserService {
                 user.getRole(),
                 user.getStatus()
         );
+    }
+
+    private RoleResponse buildRoleResponse(Role role, String label, Long tenantId) {
+        long count = repo.countByRoleAndTenantId(role, tenantId);
+        return new RoleResponse(role.name(), label, count);
     }
 
     private String generateTempPassword() {
