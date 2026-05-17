@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBankAccounts, deleteBankAccount } from "../api/accountingApi";
+import { getBankAccounts, deleteBankAccount, updateBankBalance } from "../api/accountingApi";
 import { getAssociations } from "@/modules/associations/associationApi";
 import DeleteConfirmModal from "@/modules/accounting/components/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import { Edit2, Trash2, Plus } from "lucide-react";
+import { Edit2, Trash2, Plus, X } from "lucide-react";
 
 export default function BankingTab() {
   const navigate = useNavigate();
@@ -18,6 +19,11 @@ export default function BankingTab() {
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+
+  // Update balance modal state
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [balanceAccountId, setBalanceAccountId] = useState(null);
+  const [newBalance, setNewBalance] = useState("");
 
   // Single fetch helper — throws on unexpected shape instead of silently returning []
   const fetchBankAccounts = async (assocId = null) => {
@@ -93,6 +99,30 @@ export default function BankingTab() {
     } catch (err) {
       console.error("Delete Error:", err);
       toast.error("Delete failed");
+    }
+  };
+
+  const openBalanceModal = (accId, currentBalance) => {
+    setBalanceAccountId(accId);
+    setNewBalance(String(currentBalance ?? ""));
+    setShowBalanceModal(true);
+  };
+
+  const handleUpdateBalance = async () => {
+    if (newBalance === "" || isNaN(Number(newBalance))) {
+      toast.error("Please enter a valid balance");
+      return;
+    }
+    try {
+      await updateBankBalance(balanceAccountId, Number(newBalance));
+      toast.success("Balance updated successfully");
+      setBankAccounts(await fetchBankAccounts(selectedAssoc === "All" ? null : selectedAssoc));
+      setShowBalanceModal(false);
+      setBalanceAccountId(null);
+      setNewBalance("");
+    } catch (err) {
+      console.error("Balance update error:", err);
+      toast.error(err.response?.data?.error || "Failed to update balance");
     }
   };
 
@@ -186,13 +216,22 @@ export default function BankingTab() {
                       <Edit2
                         size={18}
                         className="cursor-pointer hover:text-slate-900 transition-colors"
+                        title="Edit account"
                         onClick={() =>
                           navigate(`/dashboard/accounting/banking/edit/${acc.id}`)
                         }
                       />
+                      <span
+                        className="cursor-pointer hover:text-green-700 transition-colors text-xs font-semibold text-gray-500"
+                        title="Update balance"
+                        onClick={() => openBalanceModal(acc.id, acc.balance)}
+                      >
+                        $+
+                      </span>
                       <Trash2
                         size={18}
                         className="cursor-pointer hover:text-red-600 transition-colors"
+                        title="Delete account"
                         onClick={() => {
                           setSelectedId(acc.id);
                           setShowDeleteModal(true);
@@ -218,6 +257,31 @@ export default function BankingTab() {
           }}
           onConfirm={handleDelete}
         />
+      )}
+
+      {/* Update Balance Modal */}
+      {showBalanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm shadow-xl border-none">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="font-bold text-gray-900">Update Balance</h3>
+              <button onClick={() => setShowBalanceModal(false)}><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <Input
+                label="New Balance"
+                type="number"
+                value={newBalance}
+                onChange={(e) => setNewBalance(e.target.value)}
+                placeholder="Enter new balance"
+              />
+            </div>
+            <div className="p-4 bg-gray-50 flex gap-3 justify-end rounded-b-xl">
+              <Button variant="outline" onClick={() => setShowBalanceModal(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleUpdateBalance}>Update Balance</Button>
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );

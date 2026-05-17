@@ -7,6 +7,7 @@ import ReactDOM from "react-dom";
 import SelectRecipientsModal from "./SelectRecipientsModal";
 import { getTemplates } from "../templateApi";
 import { rescheduleEmail } from "../emailApi";
+import { toast } from "react-toastify";
 
 const inputCls = "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white transition";
 const labelCls = "block mb-1.5 text-sm font-medium text-gray-700";
@@ -67,7 +68,7 @@ const handleResubmit = async () => {
   if (loading) return;
 
   if (!scheduledDate || !scheduledTime) {
-    alert("Please select date and time");
+    toast.error("Please select date and time");
     return;
   }
 
@@ -82,11 +83,12 @@ const handleResubmit = async () => {
 
     await rescheduleEmail(email.id, payload);
 
+    toast.success("Email rescheduled successfully");
     onSuccess?.();
     onClose();
   } catch (err) {
     console.error("RESCHEDULE FAILED:", err.response?.data);
-    alert(`Error: ${err.response?.data?.error || "Check backend logs"}`);
+    toast.error(err.response?.data?.error || err.response?.data?.message || "Failed to reschedule email");
   } finally {
     setLoading(false);
   }

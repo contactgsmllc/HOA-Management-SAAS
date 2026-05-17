@@ -5,7 +5,7 @@ import LoginPage from "./platform/auth/LoginPage";
 import SignUpPage from "./platform/auth/SignUpPage";
 import ProtectedRoute from "./platform/routing/ProtectedRoute";
 import Dashboard from "./platform/dashboard/Dashboard";
-/*import Settings from "./platform/settings/Settings";*/
+import DashboardHome from "./platform/dashboard/DashboardHome";
 import TenantList from "./platform/tenant/TenantList";
 import TenantForm from "./platform/tenant/TenantForm";
 import TenantDetails from "./platform/tenant/TenantDetails";
@@ -37,7 +37,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<div>Dashboard Home</div>} />
+          <Route index element={<DashboardHome />} />
 
           {/* Tenant routes — platform admin only */}
           <Route
