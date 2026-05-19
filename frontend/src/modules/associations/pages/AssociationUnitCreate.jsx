@@ -24,7 +24,7 @@ export default function AssociationUnitCreate() {
       if (errorData?.errors && typeof errorData.errors === "object") {
         setFormErrors(errorData.errors);
       }
-      const errorMsg = errorData?.error || errorData?.message || "Failed to create unit";
+      const errorMsg = errorData?.message || errorData?.error || "Failed to create unit";
       toast.error(errorMsg);
     }
   };

@@ -82,7 +82,7 @@ const Sidebar = () => {
             {/* Users (Platform Admin) */}
             {role === "PLATFORM_ADMIN" && (
               <NavLink
-                to="/dashboard/settings"
+                to="/dashboard/users"
                 className={linkClass}
                 style={activeStyle}
               >
@@ -253,7 +253,7 @@ const Sidebar = () => {
 
                 {role === "PLATFORM_ADMIN" && (
                   <NavLink
-                    to="/dashboard/settings"
+                    to="/dashboard/users"
                     className={linkClass}
                     style={activeStyle}
                     onClick={() => setMobileOpen(false)}
@@ -344,6 +344,7 @@ const Sidebar = () => {
                     </NavLink>
                   </>
                 )}
+                {role === "TENANT_ADMIN" && (
                  <NavLink
               to="/dashboard/maintenance"
                 className={linkClass}
@@ -353,6 +354,7 @@ const Sidebar = () => {
                 <Building2 size={18} />
                  Maintenance
                 </NavLink>
+                )}
               </nav>
             </div>
 

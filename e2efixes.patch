@@ -1,0 +1,1344 @@
+From e7ab5fbb26dd4a8c7f8b885fd55b8891456e6e05 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 18 May 2026 17:58:37 +0000
+Subject: [PATCH] Fix all unchecked E2E issues from issue #196 across
+ Associations, Communications, and Accounting modules
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Associations:
+- Add Users card to PLATFORM_ADMIN dashboard; add Maintenance card to TENANT_ADMIN dashboard
+- Fix mobile sidebar: Maintenance link was missing role guard (showed to PLATFORM_ADMIN)
+- Fix sidebar Users link for PLATFORM_ADMIN pointing to wrong route (/settings → /users)
+- Create UserManagementPage with invite, activate/deactivate, delete; add /dashboard/users route
+- Fix association form: validation message and API error extraction both used wrong field
+- Fix unit create: error toast showed error code ("UNIT_ERROR") instead of readable message
+- Fix renter info in unit edit: both edit pages read unit.renter?.firstName (undefined) instead of unit.renterFirstName; renter fields were also missing from the update payload
+
+Communications:
+- Implement AccountingVariableResolver: resolve {{balance}} and {{amount}} from unit balance per owner; {{dueDate}} and {{invoiceNumber}} return empty string until invoice data is available
+- Fix RescheduleEmailModal: remove subject/body/recipients/template fields that were shown but never saved — modal now shows only date and time
+- Fix SmsServiceImpl.toResponse: hardcoded "Recipients" replaced with message.getRecipientLabel()
+
+Accounting:
+- Add bulk delete (multi-select checkboxes) to Chart of Accounts and Banking tab
+- New backend endpoints: DELETE /api/v1/accounting/coa/bulk and DELETE /api/v1/accounting/banking/bulk
+- Issue #11 (confirm account number on edit) was already fixed in AddBankingPage.jsx via !isEdit guard
+
+https://claude.ai/code/session_01V67hPE3Ko2S5NeUwt13VcE
+---
+ .../banking/controller/BankingController.java |   8 +
+ .../banking/service/BankingService.java       |   2 +
+ .../banking/service/BankingServiceImpl.java   |   7 +
+ .../coa/controller/CoaController.java         |  12 ++
+ .../accounting/coa/service/CoaService.java    |   4 +
+ .../coa/service/CoaServiceImpl.java           |   9 +
+ .../resolver/AccountingVariableResolver.java  |  67 +++---
+ .../communication/service/SmsServiceImpl.java |   2 +-
+ frontend/src/App.jsx                          |  11 +
+ .../modules/accounting/api/accountingApi.js   |   6 +
+ .../accounting/components/BankingTab.jsx      |  88 +++++++-
+ .../accounting/pages/ChartOfAccountsPage.jsx  | 102 +++++++--
+ .../components/AssociationForm.jsx            |   4 +-
+ .../pages/AssociationUnitCreate.jsx           |   2 +-
+ .../pages/AssociationUnitEdit.jsx             |  12 +-
+ .../modules/associations/pages/UnitEdit.jsx   |  12 +-
+ .../components/RescheduleEmailModal.jsx       | 195 ++++-------------
+ .../src/platform/dashboard/DashboardHome.jsx  |  16 +-
+ frontend/src/platform/layout/Sidebar.jsx      |   6 +-
+ .../src/platform/user/UserManagementPage.jsx  | 201 ++++++++++++++++++
+ 20 files changed, 550 insertions(+), 216 deletions(-)
+ create mode 100644 frontend/src/platform/user/UserManagementPage.jsx
+
+diff --git a/backend/src/main/java/com/gstech/saas/accounting/banking/controller/BankingController.java b/backend/src/main/java/com/gstech/saas/accounting/banking/controller/BankingController.java
+index 3caff7c..d35e22b 100644
+--- a/backend/src/main/java/com/gstech/saas/accounting/banking/controller/BankingController.java
++++ b/backend/src/main/java/com/gstech/saas/accounting/banking/controller/BankingController.java
+@@ -5,6 +5,7 @@ import com.gstech.saas.accounting.banking.dto.BankAccountRequest;
+ import com.gstech.saas.accounting.banking.dto.BankAccountResponse;
+ import com.gstech.saas.accounting.banking.service.BankingService;
+ import com.gstech.saas.platform.common.ApiResponse;
++import io.swagger.v3.oas.annotations.Operation;
+ import jakarta.validation.Valid;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
+@@ -74,6 +75,13 @@ public class BankingController {
+         bankingService.deleteAccount(id);
+         return ResponseEntity.noContent().build();
+     }
++
++    @Operation(summary = "Bulk delete bank accounts")
++    @DeleteMapping("/bulk")
++    public ResponseEntity<Void> bulkDeleteAccounts(@RequestBody List<Long> ids) {
++        bankingService.bulkDeleteAccounts(ids);
++        return ResponseEntity.noContent().build();
++    }
+     /**
+      * PATCH /api/v1/accounting/banking/{id}/balance
+      * Manual reconciliation update by admin
+diff --git a/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingService.java b/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingService.java
+index c2e9ef2..03b265a 100644
+--- a/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingService.java
++++ b/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingService.java
+@@ -18,5 +18,7 @@ public interface BankingService {
+ 
+     void deleteAccount(Long id);
+ 
++    void bulkDeleteAccounts(List<Long> ids);
++
+     BankAccountResponse updateBalance(Long id, BigDecimal balance);
+ }
+\ No newline at end of file
+diff --git a/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingServiceImpl.java b/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingServiceImpl.java
+index 7d077ed..03cd3df 100644
+--- a/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingServiceImpl.java
++++ b/backend/src/main/java/com/gstech/saas/accounting/banking/service/BankingServiceImpl.java
+@@ -118,6 +118,13 @@ public class BankingServiceImpl implements BankingService {
+         bankingRepository.delete(banking);
+     }
+ 
++    @Override
++    @Transactional
++    public void bulkDeleteAccounts(List<Long> ids) {
++        if (ids == null || ids.isEmpty()) return;
++        ids.forEach(this::deleteAccount);
++    }
++
+     // ─────────────────────────────────────────────────────────────────────────
+     // HELPERS
+     // ─────────────────────────────────────────────────────────────────────────
+diff --git a/backend/src/main/java/com/gstech/saas/accounting/coa/controller/CoaController.java b/backend/src/main/java/com/gstech/saas/accounting/coa/controller/CoaController.java
+index e249f58..ae58d19 100644
+--- a/backend/src/main/java/com/gstech/saas/accounting/coa/controller/CoaController.java
++++ b/backend/src/main/java/com/gstech/saas/accounting/coa/controller/CoaController.java
+@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.web.bind.annotation.*;
+ 
++import java.util.List;
++
+ @RestController
+ @RequestMapping("/api/v1/accounting/coa")
+ @RequiredArgsConstructor
+@@ -94,4 +96,14 @@ public class CoaController {
+         coaService.deleteAccount(id);
+         return ResponseEntity.noContent().build();
+     }
++
++    @Operation(
++            summary = "Bulk delete accounts",
++            description = "Soft deletes multiple chart of accounts by their IDs"
++    )
++    @DeleteMapping("/bulk")
++    public ResponseEntity<Void> bulkDeleteAccounts(@RequestBody List<Long> ids) {
++        coaService.bulkDeleteAccounts(ids);
++        return ResponseEntity.noContent().build();
++    }
+ }
+\ No newline at end of file
+diff --git a/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaService.java b/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaService.java
+index be4563d..208502e 100644
+--- a/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaService.java
++++ b/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaService.java
+@@ -6,6 +6,8 @@ import com.gstech.saas.accounting.coa.dto.AccountType;
+ import org.springframework.data.domain.Page;
+ import org.springframework.data.domain.Pageable;
+ 
++import java.util.List;
++
+ public interface CoaService {
+ 
+ 
+@@ -18,4 +20,6 @@ public interface CoaService {
+     CoaResponse updateAccount(Long id, CoaRequest request);
+ 
+     void deleteAccount(Long id);
++
++    void bulkDeleteAccounts(List<Long> ids);
+ }
+\ No newline at end of file
+diff --git a/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaServiceImpl.java b/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaServiceImpl.java
+index b54dca2..8581054 100644
+--- a/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaServiceImpl.java
++++ b/backend/src/main/java/com/gstech/saas/accounting/coa/service/CoaServiceImpl.java
+@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ import org.springframework.util.StringUtils;
+ 
++import java.util.List;
++
+ @Service
+ @RequiredArgsConstructor
+ public class CoaServiceImpl implements CoaService {
+@@ -102,4 +104,11 @@ public class CoaServiceImpl implements CoaService {
+         coa.setIsDeleted(true);
+         coaRepository.save(coa);
+     }
++
++    @Override
++    @Transactional
++    public void bulkDeleteAccounts(List<Long> ids) {
++        if (ids == null || ids.isEmpty()) return;
++        ids.forEach(this::deleteAccount);
++    }
+ }
+\ No newline at end of file
+diff --git a/backend/src/main/java/com/gstech/saas/communication/resolver/AccountingVariableResolver.java b/backend/src/main/java/com/gstech/saas/communication/resolver/AccountingVariableResolver.java
+index d1e5baf..d50e469 100644
+--- a/backend/src/main/java/com/gstech/saas/communication/resolver/AccountingVariableResolver.java
++++ b/backend/src/main/java/com/gstech/saas/communication/resolver/AccountingVariableResolver.java
+@@ -1,47 +1,66 @@
+ package com.gstech.saas.communication.resolver;
+ 
++import com.gstech.saas.associations.owner.model.UnitOwner;
++import com.gstech.saas.associations.owner.repository.UnitOwnerRepository;
+ import com.gstech.saas.communication.model.Delivery;
+ import com.gstech.saas.communication.model.Message;
++import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.stereotype.Component;
+ 
++import java.math.BigDecimal;
+ import java.util.HashMap;
++import java.util.List;
+ import java.util.Map;
+ 
+ /**
+  * Resolves accounting variables per recipient:
+- *   {{amount}}, {{dueDate}}, {{balance}}, {{invoiceNumber}}
++ *   {{amount}}, {{balance}}, {{dueDate}}, {{invoiceNumber}}
+  *
+- * TODO: inject BillRepository / LedgerRepository here when the
+- *       accounting module has owner-level bill data, then look up
+- *       the outstanding balance and due date for delivery.getOwnerId().
+- *
+- * Until then, these placeholders are left unresolved in the sent email
+- * (they will appear literally as {{amount}} etc.) — a deliberate,
+- * visible signal that accounting integration is pending.
++ * Looks up the unit balance for the delivery's owner. dueDate and
++ * invoiceNumber are left blank until invoice-level billing data is available.
+  */
+ @Slf4j
+ @Component
++@RequiredArgsConstructor
+ public class AccountingVariableResolver implements VariableResolver {
+ 
++    private final UnitOwnerRepository unitOwnerRepository;
++
+     @Override
+     public Map<String, String> resolve(Delivery delivery, Message message) {
+         Map<String, String> vars = new HashMap<>();
++        vars.put("amount", "");
++        vars.put("dueDate", "");
++        vars.put("balance", "");
++        vars.put("invoiceNumber", "");
++
++        if (delivery.getOwnerId() == null) {
++            return vars;
++        }
++
++        try {
++            List<UnitOwner> unitOwners = unitOwnerRepository.findByOwnerId(delivery.getOwnerId());
++
++            // Use the first unit linked to this owner within the message's association
++            BigDecimal balance = unitOwners.stream()
++                    .filter(uo -> uo.getUnit() != null
++                            && (message.getAssociationId() == null
++                                || message.getAssociationId().equals(uo.getUnit().getAssociation().getId())))
++                    .map(uo -> uo.getUnit().getBalance())
++                    .filter(b -> b != null)
++                    .findFirst()
++                    .orElse(BigDecimal.ZERO);
++
++            String balanceStr = "$" + balance.toPlainString();
++            vars.put("balance", balanceStr);
++            vars.put("amount", balanceStr);
++
++        } catch (Exception e) {
++            log.warn("[AccountingVariableResolver] Failed to resolve balance for ownerId={}: {}",
++                    delivery.getOwnerId(), e.getMessage());
++        }
+ 
+-        // TODO: replace with real accounting lookup per ownerId
+-        // Example future implementation:
+-        //   Bill bill = billRepository.findLatestByOwnerAndAssociation(
+-        //       delivery.getOwnerId(), message.getAssociationId());
+-        //   if (bill != null) {
+-        //       vars.put("amount",        "$" + bill.getAmount());
+-        //       vars.put("dueDate",       bill.getDueDate().toString());
+-        //       vars.put("balance",       "$" + bill.getBalance());
+-        //       vars.put("invoiceNumber", bill.getInvoiceNumber());
+-        //   }
+-
+-        log.debug("[AccountingVariableResolver] No accounting data wired yet for ownerId={}",
+-                delivery.getOwnerId());
+-
+-        return vars; // empty — placeholders stay intact until accounting is wired
++        return vars;
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/backend/src/main/java/com/gstech/saas/communication/service/SmsServiceImpl.java b/backend/src/main/java/com/gstech/saas/communication/service/SmsServiceImpl.java
+index 48c52f3..bd3ff5b 100644
+--- a/backend/src/main/java/com/gstech/saas/communication/service/SmsServiceImpl.java
++++ b/backend/src/main/java/com/gstech/saas/communication/service/SmsServiceImpl.java
+@@ -236,7 +236,7 @@ public class SmsServiceImpl implements SmsService {
+         return new SmsResponse(
+                 message.getId(),
+                 message.getBody(),
+-                "Recipients",
++                message.getRecipientLabel(),
+                 phoneNumbers,
+                 message.getStatus() == MessageStatus.SCHEDULED
+                         ? message.getScheduledAt()
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 771a197..f78ba0a 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -10,6 +10,7 @@ import TenantList from "./platform/tenant/TenantList";
+ import TenantForm from "./platform/tenant/TenantForm";
+ import TenantDetails from "./platform/tenant/TenantDetails";
+ import EditSubscription from "./platform/tenant/EditSubscription";
++import UserManagementPage from "./platform/user/UserManagementPage";
+ import { associationRoutes } from "./modules/associations/routes";
+ import { ownershipRoutes } from "./modules/ownership/routes";
+ import { communicationRoutes } from "./modules/communication/routes";
+@@ -69,6 +70,16 @@ export default function App() {
+             element={<EditSubscription />}
+           />
+ 
++          {/* User management — platform admin only */}
++          <Route
++            path="users"
++            element={
++              <ProtectedRoute allowedRoles={["PLATFORM_ADMIN"]}>
++                <UserManagementPage />
++              </ProtectedRoute>
++            }
++          />
++
+           {/* Association routes */}
+           {associationRoutes}
+ 
+diff --git a/frontend/src/modules/accounting/api/accountingApi.js b/frontend/src/modules/accounting/api/accountingApi.js
+index acc25f3..afdffba 100644
+--- a/frontend/src/modules/accounting/api/accountingApi.js
++++ b/frontend/src/modules/accounting/api/accountingApi.js
+@@ -22,6 +22,9 @@ export const updateAccount = (id, data) =>
+ export const deleteAccount = (id) =>
+   httpClient.delete(`/api/v1/accounting/coa/${id}`);
+ 
++export const bulkDeleteAccounts = (ids) =>
++  httpClient.delete("/api/v1/accounting/coa/bulk", { data: ids });
++
+ 
+ 
+ export const getLedgerEntries = (params = {}) => {
+@@ -55,6 +58,9 @@ export const updateBankAccount = (id, data) =>
+ export const deleteBankAccount = (id) =>
+   httpClient.delete(`/api/v1/accounting/banking/${id}`);
+ 
++export const bulkDeleteBankAccounts = (ids) =>
++  httpClient.delete("/api/v1/accounting/banking/bulk", { data: ids });
++
+ export const updateBankBalance = (id, balance) =>
+   httpClient.patch(`/api/v1/accounting/banking/${id}/balance`, { balance });
+ 
+diff --git a/frontend/src/modules/accounting/components/BankingTab.jsx b/frontend/src/modules/accounting/components/BankingTab.jsx
+index 76be2a9..5187893 100644
+--- a/frontend/src/modules/accounting/components/BankingTab.jsx
++++ b/frontend/src/modules/accounting/components/BankingTab.jsx
+@@ -1,6 +1,6 @@
+ import { useState, useEffect } from "react";
+ import { useNavigate } from "react-router-dom";
+-import { getBankAccounts, deleteBankAccount, updateBankBalance } from "../api/accountingApi";
++import { getBankAccounts, deleteBankAccount, bulkDeleteBankAccounts, updateBankBalance } from "../api/accountingApi";
+ import { getAssociations } from "@/modules/associations/associationApi";
+ import DeleteConfirmModal from "@/modules/accounting/components/DeleteConfirmModal";
+ import { toast } from "react-toastify";
+@@ -19,13 +19,14 @@ export default function BankingTab() {
+   const [loading, setLoading] = useState(false);
+   const [showDeleteModal, setShowDeleteModal] = useState(false);
+   const [selectedId, setSelectedId] = useState(null);
++  const [selectedIds, setSelectedIds] = useState(new Set());
++  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+ 
+   // Update balance modal state
+   const [showBalanceModal, setShowBalanceModal] = useState(false);
+   const [balanceAccountId, setBalanceAccountId] = useState(null);
+   const [newBalance, setNewBalance] = useState("");
+ 
+-  // Single fetch helper — throws on unexpected shape instead of silently returning []
+   const fetchBankAccounts = async (assocId = null) => {
+     const res = await getBankAccounts(assocId);
+     const data =
+@@ -77,6 +78,7 @@ export default function BankingTab() {
+     setSelectedAssoc(val);
+     try {
+       setLoading(true);
++      setSelectedIds(new Set());
+       setBankAccounts(await fetchBankAccounts(val === "All" ? null : val));
+     } catch (err) {
+       console.error("Filter Error:", err);
+@@ -102,6 +104,37 @@ export default function BankingTab() {
+     }
+   };
+ 
++  const handleBulkDelete = async () => {
++    try {
++      await bulkDeleteBankAccounts([...selectedIds]);
++      toast.success(`${selectedIds.size} bank account(s) deleted`);
++      setShowBulkDeleteModal(false);
++      setSelectedIds(new Set());
++      setBankAccounts(await fetchBankAccounts(selectedAssoc === "All" ? null : selectedAssoc));
++    } catch (err) {
++      console.error("Bulk Delete Error:", err);
++      toast.error("Failed to delete selected accounts");
++    }
++  };
++
++  const toggleSelect = (id) => {
++    setSelectedIds((prev) => {
++      const next = new Set(prev);
++      next.has(id) ? next.delete(id) : next.add(id);
++      return next;
++    });
++  };
++
++  const toggleSelectAll = () => {
++    if (selectedIds.size === bankAccounts.length) {
++      setSelectedIds(new Set());
++    } else {
++      setSelectedIds(new Set(bankAccounts.map((a) => a.id)));
++    }
++  };
++
++  const allSelected = bankAccounts.length > 0 && selectedIds.size === bankAccounts.length;
++
+   const openBalanceModal = (accId, currentBalance) => {
+     setBalanceAccountId(accId);
+     setNewBalance(String(currentBalance ?? ""));
+@@ -143,8 +176,16 @@ export default function BankingTab() {
+         </div>
+       </Card>
+ 
+-      {/* Add Button */}
+-      <div className="flex justify-end mb-4">
++      {/* Action buttons */}
++      <div className="flex justify-end gap-2 mb-4">
++        {selectedIds.size > 0 && (
++          <Button
++            variant="danger"
++            onClick={() => setShowBulkDeleteModal(true)}
++          >
++            Delete Selected ({selectedIds.size})
++          </Button>
++        )}
+         <Button
+           variant="primary"
+           onClick={() => navigate("/dashboard/accounting/banking/create")}
+@@ -158,6 +199,14 @@ export default function BankingTab() {
+         <table className="w-full table-auto border-collapse">
+           <thead style={{ backgroundColor: "#a9c3f7" }}>
+             <tr>
++              <th className="border-r border-gray-300 p-4 w-10">
++                <input
++                  type="checkbox"
++                  checked={allSelected}
++                  onChange={toggleSelectAll}
++                  className="w-4 h-4 cursor-pointer"
++                />
++              </th>
+               <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-center">
+                 Association
+               </th>
+@@ -179,19 +228,30 @@ export default function BankingTab() {
+           <tbody className="divide-y divide-gray-200">
+             {loading ? (
+               <tr>
+-                <td colSpan={5} className="p-10 text-center text-gray-400">
++                <td colSpan={6} className="p-10 text-center text-gray-400">
+                   Loading...
+                 </td>
+               </tr>
+             ) : bankAccounts.length === 0 ? (
+               <tr>
+-                <td colSpan={5} className="p-20 text-center text-gray-500">
++                <td colSpan={6} className="p-20 text-center text-gray-500">
+                   No bank accounts found.
+                 </td>
+               </tr>
+             ) : (
+               bankAccounts.map((acc) => (
+-                <tr key={acc.id} className="hover:bg-gray-50 transition-colors">
++                <tr
++                  key={acc.id}
++                  className={`hover:bg-gray-50 transition-colors ${selectedIds.has(acc.id) ? "bg-blue-50" : ""}`}
++                >
++                  <td className="border-r border-gray-300 p-4 text-center">
++                    <input
++                      type="checkbox"
++                      checked={selectedIds.has(acc.id)}
++                      onChange={() => toggleSelect(acc.id)}
++                      className="w-4 h-4 cursor-pointer"
++                    />
++                  </td>
+                   <td className="border-r border-gray-300 p-4 text-sm text-gray-700">
+                     {acc.associationName || "N/A"}
+                   </td>
+@@ -246,7 +306,7 @@ export default function BankingTab() {
+         </table>
+       </div>
+ 
+-      {/* Delete Modal */}
++      {/* Single Delete Modal */}
+       {showDeleteModal && (
+         <DeleteConfirmModal
+           title="Delete Bank Account"
+@@ -259,6 +319,16 @@ export default function BankingTab() {
+         />
+       )}
+ 
++      {/* Bulk Delete Modal */}
++      {showBulkDeleteModal && (
++        <DeleteConfirmModal
++          title="Delete Selected Bank Accounts"
++          message={`Are you sure you want to delete ${selectedIds.size} selected bank account(s)? This action cannot be undone.`}
++          onClose={() => setShowBulkDeleteModal(false)}
++          onConfirm={handleBulkDelete}
++        />
++      )}
++
+       {/* Update Balance Modal */}
+       {showBalanceModal && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+@@ -285,4 +355,4 @@ export default function BankingTab() {
+       )}
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/frontend/src/modules/accounting/pages/ChartOfAccountsPage.jsx b/frontend/src/modules/accounting/pages/ChartOfAccountsPage.jsx
+index c1ca234..89886cc 100644
+--- a/frontend/src/modules/accounting/pages/ChartOfAccountsPage.jsx
++++ b/frontend/src/modules/accounting/pages/ChartOfAccountsPage.jsx
+@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
+ import { createPortal } from "react-dom";
+ import { useNavigate } from "react-router-dom";
+ import { toast } from "react-toastify";
+-import { getCoaList, deleteAccount } from "../api/accountingApi";
++import { getCoaList, deleteAccount, bulkDeleteAccounts } from "../api/accountingApi";
+ import Button from "@/components/ui/Button";
+ import Input from "@/components/ui/Input";
+ import Select from "@/components/ui/Select";
+@@ -25,19 +25,17 @@ const DotsMenu = ({ onEdit, onDelete }) => {
+   const btnRef = useRef(null);
+   const menuRef = useRef(null);
+ 
+-  // Position the portal dropdown relative to the button
+   const handleOpen = () => {
+     if (!open && btnRef.current) {
+       const rect = btnRef.current.getBoundingClientRect();
+       setMenuPos({
+         top:  rect.bottom + window.scrollY + 4,
+-        left: rect.right  + window.scrollX - 144, // 144 = w-36
++        left: rect.right  + window.scrollX - 144,
+       });
+     }
+     setOpen((p) => !p);
+   };
+ 
+-  // Close on outside click
+   useEffect(() => {
+     if (!open) return;
+     const handler = (e) => {
+@@ -105,6 +103,8 @@ export default function ChartOfAccountsPage() {
+   const [debouncedSearch, setDebouncedSearch] = useState("");
+   const [typeFilter, setTypeFilter]     = useState("");
+   const [deleteTarget, setDeleteTarget] = useState(null);
++  const [selectedIds, setSelectedIds]   = useState(new Set());
++  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+ 
+   // Debounce search 400ms
+   useEffect(() => {
+@@ -119,6 +119,7 @@ export default function ChartOfAccountsPage() {
+       const content = res.data?.content ?? [];
+       setAccounts(content);
+       setTotal(res.data?.totalElements ?? content.length);
++      setSelectedIds(new Set());
+     } catch {
+       toast.error("Failed to fetch accounts");
+     } finally {
+@@ -139,19 +140,59 @@ export default function ChartOfAccountsPage() {
+     }
+   };
+ 
++  const handleBulkDelete = async () => {
++    try {
++      await bulkDeleteAccounts([...selectedIds]);
++      toast.success(`${selectedIds.size} account(s) deleted`);
++      setShowBulkDeleteModal(false);
++      fetchAccounts();
++    } catch {
++      toast.error("Failed to delete selected accounts");
++    }
++  };
++
++  const toggleSelect = (id) => {
++    setSelectedIds((prev) => {
++      const next = new Set(prev);
++      next.has(id) ? next.delete(id) : next.add(id);
++      return next;
++    });
++  };
++
++  const toggleSelectAll = () => {
++    if (selectedIds.size === accounts.length) {
++      setSelectedIds(new Set());
++    } else {
++      setSelectedIds(new Set(accounts.map((a) => a.id)));
++    }
++  };
++
++  const allSelected = accounts.length > 0 && selectedIds.size === accounts.length;
++
+   return (
+     <div className="p-6">
+ 
+       {/* Header */}
+       <div className="flex items-center justify-between mb-6">
+         <h2 className="text-2xl font-semibold text-gray-900">Chart of Accounts</h2>
+-        <Button
+-          variant="primary"
+-          size="sm"
+-          onClick={() => navigate("/dashboard/accounting/chart-of-accounts/create")}
+-        >
+-          + Add Account
+-        </Button>
++        <div className="flex items-center gap-2">
++          {selectedIds.size > 0 && (
++            <Button
++              variant="danger"
++              size="sm"
++              onClick={() => setShowBulkDeleteModal(true)}
++            >
++              Delete Selected ({selectedIds.size})
++            </Button>
++          )}
++          <Button
++            variant="primary"
++            size="sm"
++            onClick={() => navigate("/dashboard/accounting/chart-of-accounts/create")}
++          >
++            + Add Account
++          </Button>
++        </div>
+       </div>
+ 
+       {/* Filters */}
+@@ -185,6 +226,14 @@ export default function ChartOfAccountsPage() {
+         <table className="w-full table-auto border-collapse">
+           <thead style={{ backgroundColor: "#a9c3f7" }}>
+             <tr>
++              <th className="border-r border-gray-300 p-4 w-10">
++                <input
++                  type="checkbox"
++                  checked={allSelected}
++                  onChange={toggleSelectAll}
++                  className="w-4 h-4 cursor-pointer"
++                />
++              </th>
+               <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Account Code</th>
+               <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Account Name</th>
+               <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Type</th>
+@@ -194,12 +243,23 @@ export default function ChartOfAccountsPage() {
+           </thead>
+           <tbody className="divide-y divide-gray-200">
+             {loading ? (
+-              <tr><td colSpan={5} className="p-10 text-center text-gray-400">Loading...</td></tr>
++              <tr><td colSpan={6} className="p-10 text-center text-gray-400">Loading...</td></tr>
+             ) : accounts.length === 0 ? (
+-              <tr><td colSpan={5} className="p-10 text-center text-gray-500">No accounts found.</td></tr>
++              <tr><td colSpan={6} className="p-10 text-center text-gray-500">No accounts found.</td></tr>
+             ) : (
+               accounts.map((account) => (
+-                <tr key={account.id} className="hover:bg-gray-50 transition-colors">
++                <tr
++                  key={account.id}
++                  className={`hover:bg-gray-50 transition-colors ${selectedIds.has(account.id) ? "bg-blue-50" : ""}`}
++                >
++                  <td className="border-r border-gray-300 p-4 text-center">
++                    <input
++                      type="checkbox"
++                      checked={selectedIds.has(account.id)}
++                      onChange={() => toggleSelect(account.id)}
++                      className="w-4 h-4 cursor-pointer"
++                    />
++                  </td>
+                   <td className="border-r border-gray-300 p-4 text-sm text-gray-700">{account.accountCode}</td>
+                   <td className="border-r border-gray-300 p-4 text-sm font-semibold text-gray-900">{account.accountName}</td>
+                   <td className="border-r border-gray-300 p-4 text-sm text-gray-700">{account.accountType}</td>
+@@ -217,7 +277,7 @@ export default function ChartOfAccountsPage() {
+         </table>
+       </div>
+ 
+-      {/* Delete Modal */}
++      {/* Single Delete Modal */}
+       {deleteTarget && (
+         <DeleteConfirmModal
+           title="Delete Account"
+@@ -226,6 +286,16 @@ export default function ChartOfAccountsPage() {
+           onConfirm={handleDelete}
+         />
+       )}
++
++      {/* Bulk Delete Modal */}
++      {showBulkDeleteModal && (
++        <DeleteConfirmModal
++          title="Delete Selected Accounts"
++          message={`Are you sure you want to delete ${selectedIds.size} selected account(s)? This action cannot be undone.`}
++          onClose={() => setShowBulkDeleteModal(false)}
++          onConfirm={handleBulkDelete}
++        />
++      )}
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/frontend/src/modules/associations/components/AssociationForm.jsx b/frontend/src/modules/associations/components/AssociationForm.jsx
+index 4e1393d..28ea626 100644
+--- a/frontend/src/modules/associations/components/AssociationForm.jsx
++++ b/frontend/src/modules/associations/components/AssociationForm.jsx
+@@ -59,7 +59,7 @@ export default function AddAssociation() {
+   const validate = () => {
+     const newErrors = {};
+ 
+-    if (!form.name) newErrors.name = "Association name is required";
++    if (!form.name) newErrors.name = "Association name must not be blank";
+     if (!form.street) newErrors.street = "Street address is required";
+     if (!form.city) newErrors.city = "City is required";
+     if (!form.state) newErrors.state = "State is required";
+@@ -100,7 +100,7 @@ export default function AddAssociation() {
+       console.error("Create association failed", error);
+ 
+       const message =
+-        error?.response?.data?.error || "Failed to create association";
++        error?.response?.data?.message || error?.response?.data?.error || "Failed to create association";
+ 
+       toast.error(message);
+     } finally {
+diff --git a/frontend/src/modules/associations/pages/AssociationUnitCreate.jsx b/frontend/src/modules/associations/pages/AssociationUnitCreate.jsx
+index c43cde8..1dd9ef0 100644
+--- a/frontend/src/modules/associations/pages/AssociationUnitCreate.jsx
++++ b/frontend/src/modules/associations/pages/AssociationUnitCreate.jsx
+@@ -24,7 +24,7 @@ export default function AssociationUnitCreate() {
+       if (errorData?.errors && typeof errorData.errors === "object") {
+         setFormErrors(errorData.errors);
+       }
+-      const errorMsg = errorData?.error || errorData?.message || "Failed to create unit";
++      const errorMsg = errorData?.message || errorData?.error || "Failed to create unit";
+       toast.error(errorMsg);
+     }
+   };
+diff --git a/frontend/src/modules/associations/pages/AssociationUnitEdit.jsx b/frontend/src/modules/associations/pages/AssociationUnitEdit.jsx
+index ae326e8..e705250 100644
+--- a/frontend/src/modules/associations/pages/AssociationUnitEdit.jsx
++++ b/frontend/src/modules/associations/pages/AssociationUnitEdit.jsx
+@@ -52,10 +52,10 @@ export default function AssociationUnitEdit() {
+     ? `${unit.unitOwners[0].firstName} ${unit.unitOwners[0].lastName}`
+     : "",
+ 
+-  renterFirstName: unit.renter?.firstName || "",
+-  renterLastName: unit.renter?.lastName || "",
+-  renterEmail: unit.renter?.email || "",
+-  renterPhone: unit.renter?.phone || "",
++  renterFirstName: unit.renterFirstName || "",
++  renterLastName: unit.renterLastName || "",
++  renterEmail: unit.renterEmail || "",
++  renterPhone: unit.renterPhone || "",
+ 
+   balance: unit.balance || 0,
+   associationName: unit.associationName || "Association",
+@@ -88,6 +88,10 @@ export default function AssociationUnitEdit() {
+         zipCode: formData.zipCode,
+         occupancyStatus: formData.occupancyStatus,
+         balance: formData.balance,
++        renterFirstName: formData.renterFirstName || null,
++        renterLastName: formData.renterLastName || null,
++        renterEmail: formData.renterEmail || null,
++        renterPhone: formData.renterPhone || null,
+       });
+ 
+       toast.success("Unit updated successfully");
+diff --git a/frontend/src/modules/associations/pages/UnitEdit.jsx b/frontend/src/modules/associations/pages/UnitEdit.jsx
+index 5dc5907..4e007c3 100644
+--- a/frontend/src/modules/associations/pages/UnitEdit.jsx
++++ b/frontend/src/modules/associations/pages/UnitEdit.jsx
+@@ -59,10 +59,10 @@ export default function UnitEdit() {
+     ? `${unit.unitOwners[0].firstName} ${unit.unitOwners[0].lastName}`
+     : "",
+ 
+-  renterFirstName: unit.renter?.firstName || "",
+-  renterLastName: unit.renter?.lastName || "",
+-  renterEmail: unit.renter?.email || "",
+-  renterPhone: unit.renter?.phone || "",
++  renterFirstName: unit.renterFirstName || "",
++  renterLastName: unit.renterLastName || "",
++  renterEmail: unit.renterEmail || "",
++  renterPhone: unit.renterPhone || "",
+ 
+   balance: unit.balance || 0,
+   associationName: unit.associationName || "",
+@@ -107,6 +107,10 @@ export default function UnitEdit() {
+         zipCode: formData.zipCode,
+         occupancyStatus: formData.occupancyStatus,
+         balance: Number(formData.balance),
++        renterFirstName: formData.renterFirstName || null,
++        renterLastName: formData.renterLastName || null,
++        renterEmail: formData.renterEmail || null,
++        renterPhone: formData.renterPhone || null,
+       });
+ 
+       toast.success("Unit updated successfully");
+diff --git a/frontend/src/modules/communication/components/RescheduleEmailModal.jsx b/frontend/src/modules/communication/components/RescheduleEmailModal.jsx
+index ac1afe4..f3f8c43 100644
+--- a/frontend/src/modules/communication/components/RescheduleEmailModal.jsx
++++ b/frontend/src/modules/communication/components/RescheduleEmailModal.jsx
+@@ -1,182 +1,76 @@
+ 
+ 
+-
+ import { useState } from "react";
+ import { X } from "lucide-react";
+ import ReactDOM from "react-dom";
+-import SelectRecipientsModal from "./SelectRecipientsModal";
+-import { getTemplates } from "../templateApi";
+ import { rescheduleEmail } from "../emailApi";
+ import { toast } from "react-toastify";
+ 
+ const inputCls = "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white transition";
+ const labelCls = "block mb-1.5 text-sm font-medium text-gray-700";
+ 
+-export default function RescheduleEmailModal({ email, onClose, onSuccess , 
+-  associationId}) {
+-  const [showRecipients, setShowRecipients] = useState(false);
+-  const [recipients, setRecipients]         = useState([]);
+-  const [templates, setTemplates]           = useState([]); 
+-  const [loading, setLoading]               = useState(false);
++export default function RescheduleEmailModal({ email, onClose, onSuccess }) {
++  const [loading, setLoading] = useState(false);
++
++  const localDate = email?.date ? new Date(email.date) : null;
+ 
+-  
+-  const [template, setTemplate]             = useState(email?.templateId || "");
+-  const [subject, setSubject]               = useState(email?.subject || "");
+-  const [message, setMessage]               = useState(email?.body || "");
+-  
++  const [scheduledDate, setScheduledDate] = useState(
++    localDate ? localDate.toLocaleDateString("en-CA") : ""
++  );
+ 
+-  /*const [scheduledDate, setScheduledDate]   = useState(email?.date?.split("T")[0] || "");
+-  const [scheduledTime, setScheduledTime]   = useState(email?.date?.split("T")[1]?.substring(0, 5) || "");*/
++  const [scheduledTime, setScheduledTime] = useState(
++    localDate
++      ? localDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
++      : ""
++  );
+ 
+-  const localDate = email?.date ? new Date(email.date) : null;
++  const handleResubmit = async () => {
++    if (loading) return;
+ 
+-const [scheduledDate, setScheduledDate] = useState(
+-  localDate ? localDate.toLocaleDateString("en-CA") : ""
+-);
+-
+-const [scheduledTime, setScheduledTime] = useState(
+-  localDate
+-    ? localDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+-    : ""
+-);
+-
+-  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+-const [loadingTemplates, setLoadingTemplates] = useState(false);
+-
+-const fetchTemplates = async () => {
+-  if (templatesLoaded) return; 
+-
+-  try {
+-    setLoadingTemplates(true);
+-
+-    const res = await getTemplates(
+-      "ASSOCIATION",
+-      email?.associationId || associationId || 1
+-    );
+-
+-    setTemplates(res?.data || []);
+-    setTemplatesLoaded(true);
+-  } catch (err) {
+-    console.error("Failed to fetch templates:", err);
+-  } finally {
+-    setLoadingTemplates(false);
+-  }
+-};
+-
+- 
+-const handleResubmit = async () => {
+-  if (loading) return;
+-
+-  if (!scheduledDate || !scheduledTime) {
+-    toast.error("Please select date and time");
+-    return;
+-  }
+-
+-  try {
+-    setLoading(true);
+-
+-    const payload = {
+-      scheduledAt: new Date(`${scheduledDate}T${scheduledTime}`).toISOString(),
+-    };
+-
+-    console.log("RESCHEDULE PAYLOAD:", payload);
+-
+-    await rescheduleEmail(email.id, payload);
+-
+-    toast.success("Email rescheduled successfully");
+-    onSuccess?.();
+-    onClose();
+-  } catch (err) {
+-    console.error("RESCHEDULE FAILED:", err.response?.data);
+-    toast.error(err.response?.data?.error || err.response?.data?.message || "Failed to reschedule email");
+-  } finally {
+-    setLoading(false);
+-  }
+-};
+-const removeRecipient = (id) => {
+-  setRecipients((prev) => prev.filter((r) => r.id !== id));
+-};
+-
+-const addRecipients = (selected) => {
+-  setRecipients((prev) => {
+-    const ids = new Set(prev.map((r) => r.id));
+-    return [...prev, ...selected.filter((r) => !ids.has(r.id))];
+-  });
+-};
++    if (!scheduledDate || !scheduledTime) {
++      toast.error("Please select date and time");
++      return;
++    }
+ 
++    try {
++      setLoading(true);
++
++      const payload = {
++        scheduledAt: new Date(`${scheduledDate}T${scheduledTime}`).toISOString(),
++      };
++
++      await rescheduleEmail(email.id, payload);
++
++      toast.success("Email rescheduled successfully");
++      onSuccess?.();
++      onClose();
++    } catch (err) {
++      toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to reschedule email");
++    } finally {
++      setLoading(false);
++    }
++  };
+ 
+   return ReactDOM.createPortal(
+     <>
+       <div className="fixed inset-0 z-9999 bg-black/40" />
+       <div className="fixed inset-0 z-10000 flex items-center justify-center px-4">
+-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: "90vh" }}>
++        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+ 
+           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+             <h3 className="text-lg font-semibold text-gray-900">Reschedule Email</h3>
+             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X size={20} /></button>
+           </div>
+ 
+-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+-
+-            <div>
+-              <label className={labelCls}>From</label>
+-              <input type="text" defaultValue="admin@example.com" className={inputCls} />
+-            </div>
+-
+-            <div>
+-              <label className={labelCls}>To <span className="text-red-500">*</span></label>
+-              {recipients.length > 0 && (
+-                <div className="flex flex-wrap gap-2 mb-2">
+-                  {recipients.map((r) => (
+-                    <span key={r.id} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+-                      {r.name}
+-                      <button onClick={() => removeRecipient(r.id)} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+-                    </span>
+-                  ))}
+-                </div>
+-              )}
+-              <button onClick={() => setShowRecipients(true)} className="px-3 py-1.5 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition">
+-                + Add Recipients
+-              </button>
+-            </div>
+-
+-            <div>
+-              <label className={labelCls}>Use Template</label>
+-            <select
+-  value={template}
+-  onChange={(e) => setTemplate(e.target.value)}
+-  onFocus={fetchTemplates}   
+-  className={inputCls}
+->
+-  <option value="">
+-    {loadingTemplates ? "Loading..." : "-- Select a template (optional) --"}
+-  </option>
+-
+-  {templates.map((t) => (
+-    <option key={t.id} value={t.id}>
+-      {t.name}
+-    </option>
+-  ))}
+-</select>
+-            </div>
+-
+-            <div>
+-              <label className={labelCls}>Subject <span className="text-red-500">*</span></label>
+-              <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter email subject" className={inputCls} />
+-            </div>
+-
+-            <div>
+-              <label className={labelCls}>Message</label>
+-              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Enter email message" rows={6} className={`${inputCls} resize-y`} />
+-            </div>
++          <div className="px-6 py-5 space-y-4">
+ 
+             <div>
+-              <label className={labelCls}>Scheduled Date</label>
++              <label className={labelCls}>Scheduled Date <span className="text-red-500">*</span></label>
+               <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className={inputCls} />
+             </div>
+ 
+             <div>
+-              <label className={labelCls}>Scheduled Time</label>
++              <label className={labelCls}>Scheduled Time <span className="text-red-500">*</span></label>
+               <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className={inputCls} />
+             </div>
+ 
+@@ -184,10 +78,10 @@ const addRecipients = (selected) => {
+ 
+           <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+             <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+-            <button 
+-              onClick={handleResubmit} 
++            <button
++              onClick={handleResubmit}
+               disabled={loading}
+-              className="px-4 py-2 text-sm text-white rounded transition hover:opacity-90" 
++              className="px-4 py-2 text-sm text-white rounded transition hover:opacity-90"
+               style={{ backgroundColor: "var(--color-primary)" }}
+             >
+               {loading ? "Saving..." : "Reschedule Email"}
+@@ -196,8 +90,7 @@ const addRecipients = (selected) => {
+ 
+         </div>
+       </div>
+-      {showRecipients && <SelectRecipientsModal onClose={() => setShowRecipients(false)} onAdd={addRecipients} />}
+     </>,
+     document.body
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/frontend/src/platform/dashboard/DashboardHome.jsx b/frontend/src/platform/dashboard/DashboardHome.jsx
+index c32b532..73ea31d 100644
+--- a/frontend/src/platform/dashboard/DashboardHome.jsx
++++ b/frontend/src/platform/dashboard/DashboardHome.jsx
+@@ -1,4 +1,4 @@
+-import { Building2, Users, CreditCard, Mail } from "lucide-react";
++import { Building2, Users, CreditCard, Mail, Settings, Wrench } from "lucide-react";
+ import { useNavigate } from "react-router-dom";
+ 
+ const StatCard = ({ icon: Icon, title, description, onClick }) => (
+@@ -35,7 +35,13 @@ export default function DashboardHome() {
+             onClick={() => navigate("/dashboard/tenants")}
+           />
+           <StatCard
+-            icon={Building2}
++            icon={Users}
++            title="Users"
++            description="Create and manage platform users"
++            onClick={() => navigate("/dashboard/users")}
++          />
++          <StatCard
++            icon={Settings}
+             title="Settings"
+             description="Configure platform-wide settings"
+             onClick={() => navigate("/dashboard/settings")}
+@@ -67,6 +73,12 @@ export default function DashboardHome() {
+           description="Send emails and messages to owners"
+           onClick={() => navigate("/dashboard/communication")}
+         />
++        <StatCard
++          icon={Wrench}
++          title="Maintenance"
++          description="Track and manage maintenance requests"
++          onClick={() => navigate("/dashboard/maintenance")}
++        />
+       </div>
+     </div>
+   );
+diff --git a/frontend/src/platform/layout/Sidebar.jsx b/frontend/src/platform/layout/Sidebar.jsx
+index b1bc459..1a35485 100644
+--- a/frontend/src/platform/layout/Sidebar.jsx
++++ b/frontend/src/platform/layout/Sidebar.jsx
+@@ -82,7 +82,7 @@ const Sidebar = () => {
+             {/* Users (Platform Admin) */}
+             {role === "PLATFORM_ADMIN" && (
+               <NavLink
+-                to="/dashboard/settings"
++                to="/dashboard/users"
+                 className={linkClass}
+                 style={activeStyle}
+               >
+@@ -253,7 +253,7 @@ const Sidebar = () => {
+ 
+                 {role === "PLATFORM_ADMIN" && (
+                   <NavLink
+-                    to="/dashboard/settings"
++                    to="/dashboard/users"
+                     className={linkClass}
+                     style={activeStyle}
+                     onClick={() => setMobileOpen(false)}
+@@ -344,6 +344,7 @@ const Sidebar = () => {
+                     </NavLink>
+                   </>
+                 )}
++                {role === "TENANT_ADMIN" && (
+                  <NavLink
+               to="/dashboard/maintenance"
+                 className={linkClass}
+@@ -353,6 +354,7 @@ const Sidebar = () => {
+                 <Building2 size={18} />
+                  Maintenance
+                 </NavLink>
++                )}
+               </nav>
+             </div>
+ 
+diff --git a/frontend/src/platform/user/UserManagementPage.jsx b/frontend/src/platform/user/UserManagementPage.jsx
+new file mode 100644
+index 0000000..31fea4a
+--- /dev/null
++++ b/frontend/src/platform/user/UserManagementPage.jsx
+@@ -0,0 +1,201 @@
++import { useState, useEffect } from "react";
++import { toast } from "react-toastify";
++import httpClient from "@/api/httpClient";
++import Button from "@/components/ui/Button";
++import Input from "@/components/ui/Input";
++import Select from "@/components/ui/Select";
++
++const ROLE_OPTIONS = [
++  { value: "TENANT_ADMIN", label: "Tenant Admin" },
++  { value: "MANAGER",      label: "Manager"      },
++  { value: "VIEWER",       label: "Viewer"       },
++];
++
++const STATUS_BADGE = {
++  ACTIVE:   "bg-green-100 text-green-700",
++  INACTIVE: "bg-gray-100  text-gray-500",
++  PENDING:  "bg-yellow-100 text-yellow-700",
++};
++
++export default function UserManagementPage() {
++  const [users, setUsers]           = useState([]);
++  const [loading, setLoading]       = useState(false);
++  const [showInvite, setShowInvite] = useState(false);
++  const [form, setForm]             = useState({ name: "", email: "", role: "TENANT_ADMIN" });
++  const [formErrors, setFormErrors] = useState({});
++  const [submitting, setSubmitting] = useState(false);
++
++  const fetchUsers = async () => {
++    try {
++      setLoading(true);
++      const res = await httpClient.get("/users");
++      setUsers(res.data || []);
++    } catch {
++      toast.error("Failed to load users");
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  useEffect(() => { fetchUsers(); }, []);
++
++  const handleChange = (e) => {
++    const { name, value } = e.target;
++    setForm((prev) => ({ ...prev, [name]: value }));
++    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: "" }));
++  };
++
++  const validate = () => {
++    const errors = {};
++    if (!form.name.trim())  errors.name  = "Name is required";
++    if (!form.email.trim()) errors.email = "Email is required";
++    if (!form.role)         errors.role  = "Role is required";
++    setFormErrors(errors);
++    return Object.keys(errors).length === 0;
++  };
++
++  const handleInvite = async (e) => {
++    e.preventDefault();
++    if (!validate()) return;
++    try {
++      setSubmitting(true);
++      await httpClient.post("/users/invite", form);
++      toast.success("User invited successfully");
++      setShowInvite(false);
++      setForm({ name: "", email: "", role: "TENANT_ADMIN" });
++      fetchUsers();
++    } catch (err) {
++      const msg = err.response?.data?.message || err.response?.data?.error || "Failed to invite user";
++      toast.error(msg);
++    } finally {
++      setSubmitting(false);
++    }
++  };
++
++  const handleToggleStatus = async (user) => {
++    const newStatus = user.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
++    try {
++      await httpClient.put(`/users/${user.id}/status`, { status: newStatus });
++      toast.success(`User ${newStatus === "ACTIVE" ? "activated" : "deactivated"}`);
++      fetchUsers();
++    } catch {
++      toast.error("Failed to update user status");
++    }
++  };
++
++  const handleDelete = async (userId) => {
++    if (!window.confirm("Are you sure you want to delete this user?")) return;
++    try {
++      await httpClient.delete(`/users/${userId}`);
++      toast.success("User deleted");
++      fetchUsers();
++    } catch {
++      toast.error("Failed to delete user");
++    }
++  };
++
++  return (
++    <div className="p-6 max-w-5xl mx-auto">
++      <div className="flex items-center justify-between mb-6">
++        <h2 className="text-2xl font-semibold text-gray-900">User Management</h2>
++        <Button variant="primary" size="sm" onClick={() => setShowInvite(true)}>
++          + Invite User
++        </Button>
++      </div>
++
++      {/* Invite Form */}
++      {showInvite && (
++        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
++          <h3 className="text-lg font-semibold text-gray-800 mb-4">Invite New User</h3>
++          <form onSubmit={handleInvite} className="grid grid-cols-1 md:grid-cols-3 gap-4">
++            <Input
++              label="Full Name"
++              name="name"
++              value={form.name}
++              onChange={handleChange}
++              placeholder="Jane Doe"
++              required
++              error={formErrors.name}
++            />
++            <Input
++              label="Email"
++              name="email"
++              type="email"
++              value={form.email}
++              onChange={handleChange}
++              placeholder="jane@example.com"
++              required
++              error={formErrors.email}
++            />
++            <Select
++              label="Role"
++              name="role"
++              value={form.role}
++              onChange={handleChange}
++              options={ROLE_OPTIONS}
++              required
++              error={formErrors.role}
++            />
++            <div className="md:col-span-3 flex gap-3 justify-end">
++              <Button type="button" variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
++              <Button type="submit" variant="primary" disabled={submitting}>
++                {submitting ? "Inviting..." : "Send Invite"}
++              </Button>
++            </div>
++          </form>
++        </div>
++      )}
++
++      {/* Users Table */}
++      <div className="w-full border border-gray-300 rounded-xl bg-white shadow-sm overflow-x-auto">
++        <table className="w-full table-auto border-collapse">
++          <thead style={{ backgroundColor: "#a9c3f7" }}>
++            <tr>
++              <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Name</th>
++              <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Email</th>
++              <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Role</th>
++              <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-left">Status</th>
++              <th className="p-4 text-xs font-bold uppercase text-gray-800 text-center">Actions</th>
++            </tr>
++          </thead>
++          <tbody className="divide-y divide-gray-200">
++            {loading ? (
++              <tr><td colSpan={5} className="p-10 text-center text-gray-400">Loading...</td></tr>
++            ) : users.length === 0 ? (
++              <tr><td colSpan={5} className="p-10 text-center text-gray-500">No users found.</td></tr>
++            ) : (
++              users.map((user) => (
++                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
++                  <td className="border-r border-gray-300 p-4 text-sm font-semibold text-gray-900">{user.name}</td>
++                  <td className="border-r border-gray-300 p-4 text-sm text-gray-700">{user.email}</td>
++                  <td className="border-r border-gray-300 p-4 text-sm text-gray-700">{user.role}</td>
++                  <td className="border-r border-gray-300 p-4">
++                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[user.status] || "bg-gray-100 text-gray-500"}`}>
++                      {user.status}
++                    </span>
++                  </td>
++                  <td className="p-4">
++                    <div className="flex justify-center gap-3">
++                      <button
++                        onClick={() => handleToggleStatus(user)}
++                        className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
++                      >
++                        {user.status === "ACTIVE" ? "Deactivate" : "Activate"}
++                      </button>
++                      <button
++                        onClick={() => handleDelete(user.id)}
++                        className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
++                      >
++                        Delete
++                      </button>
++                    </div>
++                  </td>
++                </tr>
++              ))
++            )}
++          </tbody>
++        </table>
++      </div>
++    </div>
++  );
++}
+-- 
+2.43.0
+

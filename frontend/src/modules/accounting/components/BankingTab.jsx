@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBankAccounts, deleteBankAccount, updateBankBalance } from "../api/accountingApi";
+import { getBankAccounts, deleteBankAccount, bulkDeleteBankAccounts, updateBankBalance } from "../api/accountingApi";
 import { getAssociations } from "@/modules/associations/associationApi";
 import DeleteConfirmModal from "@/modules/accounting/components/DeleteConfirmModal";
 import { toast } from "react-toastify";
@@ -19,13 +19,14 @@ export default function BankingTab() {
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // Update balance modal state
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [balanceAccountId, setBalanceAccountId] = useState(null);
   const [newBalance, setNewBalance] = useState("");
 
-  // Single fetch helper — throws on unexpected shape instead of silently returning []
   const fetchBankAccounts = async (assocId = null) => {
     const res = await getBankAccounts(assocId);
     const data =
@@ -77,6 +78,7 @@ export default function BankingTab() {
     setSelectedAssoc(val);
     try {
       setLoading(true);
+      setSelectedIds(new Set());
       setBankAccounts(await fetchBankAccounts(val === "All" ? null : val));
     } catch (err) {
       console.error("Filter Error:", err);
@@ -101,6 +103,37 @@ export default function BankingTab() {
       toast.error("Delete failed");
     }
   };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteBankAccounts([...selectedIds]);
+      toast.success(`${selectedIds.size} bank account(s) deleted`);
+      setShowBulkDeleteModal(false);
+      setSelectedIds(new Set());
+      setBankAccounts(await fetchBankAccounts(selectedAssoc === "All" ? null : selectedAssoc));
+    } catch (err) {
+      console.error("Bulk Delete Error:", err);
+      toast.error("Failed to delete selected accounts");
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === bankAccounts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(bankAccounts.map((a) => a.id)));
+    }
+  };
+
+  const allSelected = bankAccounts.length > 0 && selectedIds.size === bankAccounts.length;
 
   const openBalanceModal = (accId, currentBalance) => {
     setBalanceAccountId(accId);
@@ -143,8 +176,16 @@ export default function BankingTab() {
         </div>
       </Card>
 
-      {/* Add Button */}
-      <div className="flex justify-end mb-4">
+      {/* Action buttons */}
+      <div className="flex justify-end gap-2 mb-4">
+        {selectedIds.size > 0 && (
+          <Button
+            variant="danger"
+            onClick={() => setShowBulkDeleteModal(true)}
+          >
+            Delete Selected ({selectedIds.size})
+          </Button>
+        )}
         <Button
           variant="primary"
           onClick={() => navigate("/dashboard/accounting/banking/create")}
@@ -158,6 +199,14 @@ export default function BankingTab() {
         <table className="w-full table-auto border-collapse">
           <thead style={{ backgroundColor: "#a9c3f7" }}>
             <tr>
+              <th className="border-r border-gray-300 p-4 w-10">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th className="border-r border-gray-300 p-4 text-xs font-bold uppercase text-gray-800 text-center">
                 Association
               </th>
@@ -179,19 +228,30 @@ export default function BankingTab() {
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-gray-400">
+                <td colSpan={6} className="p-10 text-center text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : bankAccounts.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-20 text-center text-gray-500">
+                <td colSpan={6} className="p-20 text-center text-gray-500">
                   No bank accounts found.
                 </td>
               </tr>
             ) : (
               bankAccounts.map((acc) => (
-                <tr key={acc.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={acc.id}
+                  className={`hover:bg-gray-50 transition-colors ${selectedIds.has(acc.id) ? "bg-blue-50" : ""}`}
+                >
+                  <td className="border-r border-gray-300 p-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(acc.id)}
+                      onChange={() => toggleSelect(acc.id)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                  </td>
                   <td className="border-r border-gray-300 p-4 text-sm text-gray-700">
                     {acc.associationName || "N/A"}
                   </td>
@@ -246,7 +306,7 @@ export default function BankingTab() {
         </table>
       </div>
 
-      {/* Delete Modal */}
+      {/* Single Delete Modal */}
       {showDeleteModal && (
         <DeleteConfirmModal
           title="Delete Bank Account"
@@ -256,6 +316,16 @@ export default function BankingTab() {
             setSelectedId(null);
           }}
           onConfirm={handleDelete}
+        />
+      )}
+
+      {/* Bulk Delete Modal */}
+      {showBulkDeleteModal && (
+        <DeleteConfirmModal
+          title="Delete Selected Bank Accounts"
+          message={`Are you sure you want to delete ${selectedIds.size} selected bank account(s)? This action cannot be undone.`}
+          onClose={() => setShowBulkDeleteModal(false)}
+          onConfirm={handleBulkDelete}
         />
       )}
 

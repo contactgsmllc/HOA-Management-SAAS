@@ -1,4 +1,4 @@
-import { Building2, Users, CreditCard, Mail } from "lucide-react";
+import { Building2, Users, CreditCard, Mail, Settings, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const StatCard = ({ icon: Icon, title, description, onClick }) => (
@@ -35,7 +35,13 @@ export default function DashboardHome() {
             onClick={() => navigate("/dashboard/tenants")}
           />
           <StatCard
-            icon={Building2}
+            icon={Users}
+            title="Users"
+            description="Create and manage platform users"
+            onClick={() => navigate("/dashboard/users")}
+          />
+          <StatCard
+            icon={Settings}
             title="Settings"
             description="Configure platform-wide settings"
             onClick={() => navigate("/dashboard/settings")}
@@ -66,6 +72,12 @@ export default function DashboardHome() {
           title="Communication"
           description="Send emails and messages to owners"
           onClick={() => navigate("/dashboard/communication")}
+        />
+        <StatCard
+          icon={Wrench}
+          title="Maintenance"
+          description="Track and manage maintenance requests"
+          onClick={() => navigate("/dashboard/maintenance")}
         />
       </div>
     </div>

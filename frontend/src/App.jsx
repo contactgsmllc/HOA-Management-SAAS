@@ -10,6 +10,7 @@ import TenantList from "./platform/tenant/TenantList";
 import TenantForm from "./platform/tenant/TenantForm";
 import TenantDetails from "./platform/tenant/TenantDetails";
 import EditSubscription from "./platform/tenant/EditSubscription";
+import UserManagementPage from "./platform/user/UserManagementPage";
 import { associationRoutes } from "./modules/associations/routes";
 import { ownershipRoutes } from "./modules/ownership/routes";
 import { communicationRoutes } from "./modules/communication/routes";
@@ -67,6 +68,16 @@ export default function App() {
           <Route
             path="tenants/subscription/:tenantId"
             element={<EditSubscription />}
+          />
+
+          {/* User management — platform admin only */}
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute allowedRoles={["PLATFORM_ADMIN"]}>
+                <UserManagementPage />
+              </ProtectedRoute>
+            }
           />
 
           {/* Association routes */}
