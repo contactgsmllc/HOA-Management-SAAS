@@ -16,6 +16,7 @@ import { communicationRoutes } from "./modules/communication/routes";
 import {accountingRoutes} from "./modules/accounting/routes";
 import { settingsRoutes } from "./modules/settings/routes";
 import { maintenanceRoutes } from "./modules/maintenance/routes";
+import { helpRoutes } from "./modules/help/routes";
 import LandingPage from "./platform/landing/LandingPage";
 
 export default function App() {
@@ -87,6 +88,8 @@ export default function App() {
 
           {/* Settings */}
           {settingsRoutes}
+            {/* Help */}
+            {helpRoutes}
 
         </Route>
 
