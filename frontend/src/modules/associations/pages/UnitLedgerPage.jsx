@@ -174,12 +174,6 @@ const UnitLedgerPage = () => {
           >
             Back to Unit {unitNumber}
           </Button>
-
-          <div className="flex items-center border border-gray-300 rounded-lg bg-white shadow-sm overflow-hidden text-sm h-10">
-            <button type="button" className="px-3 h-full hover:bg-gray-50 border-r border-gray-200 transition-colors">&larr;</button>
-            <span className="px-4 text-gray-600 font-medium">1 / 3</span>
-            <button type="button" className="px-3 h-full hover:bg-gray-50 border-l border-gray-200 transition-colors">&rarr;</button>
-          </div>
         </div>
       </div>
 
@@ -274,9 +268,9 @@ const UnitLedgerPage = () => {
               onChange={(e) => setTransactionType(e.target.value)}
               options={[
                 { value: 'All Types', label: 'All Types' },
-                { value: 'Invoice', label: 'Invoice' },
+                { value: 'charge', label: 'Charge' },
                 { value: 'Payment', label: 'Payment' },
-                { value: 'Fee', label: 'Fee' }
+               
               ]}
             />
           </div>
@@ -343,29 +337,55 @@ const UnitLedgerPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 text-gray-700">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-gray-50">
-                    <td className="border-r border-gray-200 p-4 text-sm text-center text-gray-600 whitespace-nowrap">{tx.date}</td>
-                    <td className="border-r border-gray-200 p-4 text-sm text-center text-gray-600">{tx.description}</td>
-                    <td className="border-r border-gray-200 p-4 text-sm text-center text-gray-600 whitespace-nowrap">{tx.account || 'General'}</td>
-                    <td className="border-r border-gray-200 p-4 text-sm text-center whitespace-nowrap">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${tx.type === 'CHARGE' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="border-r border-gray-200 p-4 text-sm text-center whitespace-nowrap text-red-600 font-medium">
-                      {tx.charges ? `$${Number(tx.charges).toFixed(2)}` : '—'}
-                    </td>
-                    <td className="border-r border-gray-200 p-4 text-sm text-center whitespace-nowrap text-green-700 font-medium">
-                      {tx.payments ? `$${Number(tx.payments).toFixed(2)}` : '—'}
-                    </td>
-                    <td className="p-4 text-sm text-center whitespace-nowrap font-bold text-blue-600">
-                      ${Number(tx.balance ?? 0).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+  {transactions.map((tx) => {
+    // Determine if this transaction is a charge or a payment
+    const isCharge = tx.transactionType === 'CHARGE';
+    const isPayment = tx.transactionType === 'PAYMENT';
+
+    return (
+      <tr key={tx.id} className="hover:bg-gray-50">
+        {/* Date */}
+        <td className="border-r border-gray-200 p-4 text-sm text-center text-gray-600 whitespace-nowrap">
+          {tx.date}
+        </td>
+        
+        {/* Description */}
+        <td className="border-r border-gray-200 p-4 text-sm text-center text-gray-600">
+          {tx.description || '—'}
+        </td>
+        
+        {/* Account */}
+        <td className="border-r border-gray-200 p-4 text-sm text-center text-gray-600 whitespace-nowrap">
+          {tx.accountName || 'General'}
+        </td>
+        
+        {/* Type  */}
+        <td className="border-r border-gray-200 p-4 text-sm text-center whitespace-nowrap">
+          <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+            isCharge ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
+          }`}>
+            {tx.transactionType}
+          </span>
+        </td>
+        
+        {/* Charges*/}
+        <td className="border-r border-gray-200 p-4 text-sm text-center whitespace-nowrap text-red-600 font-medium">
+          {isCharge ? `$${Number(tx.amount).toFixed(2)}` : '—'}
+        </td>
+        
+        {/* Payments */}
+        <td className="border-r border-gray-200 p-4 text-sm text-center whitespace-nowrap text-green-700 font-medium">
+          {isPayment ? `$${Number(tx.amount).toFixed(2)}` : '—'}
+        </td>
+        
+        {/* Balance */}
+        <td className="p-4 text-sm text-center whitespace-nowrap font-bold text-blue-600">
+          ${Number(tx.runningBalance ?? 0).toFixed(2)}
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
             </table>
           </div>
         )}
