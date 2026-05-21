@@ -10,19 +10,28 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import StatCard from "@/components/ui/StatCard";
-
 // Utility functions for Date Presets
 const getDatePresets = () => {
   const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); 
 
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const formatYYYYMMDD = (y, m, d) => {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
 
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+  const startOfMonth = formatYYYYMMDD(year, month, 1);
+  const lastDayOfThisMonth = new Date(year, month + 1, 0).getDate(); 
+  const endOfMonth = formatYYYYMMDD(year, month, lastDayOfThisMonth);
 
-  const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-  const endOfYear = new Date(now.getFullYear(), 12, 0).toISOString().split('T')[0];
+  const startOfLastMonth = formatYYYYMMDD(year, month - 1, 1);
+  const lastDayOfLastMonth = new Date(year, month, 0).getDate(); 
+  const endOfLastMonth = formatYYYYMMDD(year, month - 1, lastDayOfLastMonth);
+
+  const startOfYear = formatYYYYMMDD(year, 0, 1);
+  const endOfYear = formatYYYYMMDD(year, 11, 31);
 
   return {
     'This Month': { from: startOfMonth, to: endOfMonth },
@@ -31,7 +40,6 @@ const getDatePresets = () => {
     'Custom': { from: '', to: '' }
   };
 };
-
 const UnitLedgerPage = () => {
   const { associationId, unitId } = useParams();
   const navigate = useNavigate();
