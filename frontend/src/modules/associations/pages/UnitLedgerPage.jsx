@@ -140,7 +140,7 @@ const UnitLedgerPage = () => {
   };
 
   const handleExport = () => {
-    alert("Feature coming soon!");
+    toast.success("Feature coming soon!");
   };
 
   //Falls back to checking the unit's direct nested associationName property
