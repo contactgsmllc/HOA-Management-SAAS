@@ -189,15 +189,15 @@ const UnitLedgerPage = () => {
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <StatCard
-          title="Current Balance"
+          label="Current Balance"
           value={`$${Number(summary.currentBalance || 0).toFixed(2)}`}
         />
         <StatCard
-          title="Total Charges"
+          label="Total Charges"
           value={`$${Number(summary.totalCharges || 0).toFixed(2)}`}
         />
         <StatCard
-          title="Total Payments"
+          label="Total Payments"
           value={`$${Number(summary.totalPayments || 0).toFixed(2)}`}
         />
       </div>
