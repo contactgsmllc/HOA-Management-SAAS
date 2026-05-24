@@ -22,8 +22,8 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     @Query("""
     SELECT b FROM Bill b
     WHERE b.tenantId = :tenantId
-      AND (:associationId IS NULL OR b.associationId = :associationId)
-      AND (:status IS NULL OR b.status = :status)
+    AND b.associationId = COALESCE(:associationId, b.associationId)
+    AND b.status = COALESCE(CAST(:status AS string), b.status)
       AND b.issueDate >= COALESCE(:from, b.issueDate)
       AND b.issueDate <= COALESCE(:to, b.issueDate)
 """)

@@ -97,6 +97,23 @@ public class BillController {
         return billService.update(id, request);
     }
 
+    /* ===============================
+   BILL Summary
+  =============================== */
+    @Operation(
+            summary = "Bill Summary",
+            description = "Returns aggregated bill summary including total bills count, total amount, unpaid amount, and overdue amount. Scoped by tenant and optional association filter."
+    )
+    @GetMapping("/summary")
+    public BillSummaryResponse summary(
+            @RequestParam(required = false) Long associationId
+    ) {
+        return billService.getSummary(associationId);
+    }
+        /* ===============================
+        GET BILL BY ID
+        =============================== */
+
     @Operation(
             summary = "Get Bill By ID",
             description = "Fetch bill by its ID"
@@ -134,19 +151,6 @@ public class BillController {
         return billService.pay(id, request);
     }
 
-    /* ===============================
-       BILL Summary
-      =============================== */
-    @Operation(
-            summary = "Bill Summary",
-            description = "Returns aggregated bill summary including total bills count, total amount, unpaid amount, and overdue amount. Scoped by tenant and optional association filter."
-    )
-    @GetMapping("/summary")
-    public BillSummaryResponse summary(
-            @RequestParam(required = false) Long associationId
-    ) {
-        return billService.getSummary(associationId);
-    }
        /* ===================================================
        NEW — ATTACHMENT ENDPOINTS
        =================================================== */
