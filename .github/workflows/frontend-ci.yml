@@ -3,6 +3,10 @@ name: Frontend CI
 on:
   pull_request:
     branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'package.json'
+      - '.github/workflows/frontend-ci.yml'
 
 jobs:
   frontend-check:
@@ -13,7 +17,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - run: npm install
         working-directory: frontend
