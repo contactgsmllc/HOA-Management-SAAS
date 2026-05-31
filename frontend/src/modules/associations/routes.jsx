@@ -14,6 +14,7 @@ import OwnerAdd from "@/modules/associations/pages/OwnerAdd";
 import OwnershipAccountDetails from "../ownership/pages/OwnershipAccountDetails";
 import OwnershipAccountEdit from "../ownership/pages/OwnershipAccountEdit";
 import UnitLedgerPage from "./pages/UnitLedgerPage";
+import CreateInvoicePage from "../associations/pages/CreateInvoicePage";
 export const associationRoutes = (
   <>
     {/* Associations */}
@@ -65,5 +66,10 @@ export const associationRoutes = (
   path="associations/:associationId/units/:unitId/ledger"
   element={<UnitLedgerPage />}
 />
+{/* Create Invoice */}
+    <Route
+      path="associations/:associationId/units/:unitId/invoice/create"
+      element={<CreateInvoicePage />}
+    />
 </>
 );
