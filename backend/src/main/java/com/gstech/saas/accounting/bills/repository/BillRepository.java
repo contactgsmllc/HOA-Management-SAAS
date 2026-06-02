@@ -8,9 +8,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface BillRepository extends JpaRepository<Bill, Long> {
@@ -57,4 +59,16 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
       AND (:associationId IS NULL OR b.associationId = :associationId)
 """)
     BillSummaryResponse getBillSummary(Long tenantId, Long associationId);
+
+    @Query("""
+    SELECT b FROM Bill b
+    WHERE b.tenantId = :tenantId
+      AND b.issueDate BETWEEN :from AND :to
+      AND b.associationId = COALESCE(:associationId, b.associationId)
+""")
+    List<Bill> findBillsForVendorSpending(
+            @Param("tenantId")      Long tenantId,
+            @Param("from")          LocalDate from,
+            @Param("to")            LocalDate to,
+            @Param("associationId") Long associationId);
 }

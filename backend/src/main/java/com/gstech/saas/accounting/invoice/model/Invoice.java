@@ -1,5 +1,6 @@
 package com.gstech.saas.accounting.invoice.model;
 
+import com.gstech.saas.accounting.invoice.dto.InvoiceStatus;
 import com.gstech.saas.platform.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -47,7 +48,14 @@ public class Invoice extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private InvoiceStatus status = InvoiceStatus.UNPAID;
+
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InvoiceLineItem> lineItems = new ArrayList<>();
+
+
 }

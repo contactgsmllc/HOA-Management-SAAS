@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
      * Single query handles all filter combinations.
@@ -83,4 +84,20 @@ WHERE l.tenantId = :tenantId
             @Param("tenantId") Long tenantId,
             @Param("associationId") Long associationId
     );
+
+    @Query("""
+    SELECT l.date, l.description, COALESCE(SUM(l.credit), 0)
+    FROM Ledger l
+    WHERE l.tenantId = :tenantId
+      AND l.associationId = :associationId
+      AND l.credit > 0
+      AND l.date BETWEEN :from AND :to
+    GROUP BY l.date, l.description
+    ORDER BY l.date ASC
+""")
+    List<Object[]> findCreditEntriesByAssociationAndDateRange(
+            @Param("tenantId") Long tenantId,
+            @Param("associationId") Long associationId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
     }
