@@ -18,19 +18,18 @@ public record BankAccountRequest(
         @NotNull(message = "Account type is required")
         BankAccountType accountType,
 
-        // defaults to "United States" if not provided
         String country,
 
         @NotBlank(message = "Routing number is required")
         String routingNumber,
-        /**
-         * Full account number — only last 4 digits are persisted as "****XXXX".
-         * The full number is discarded after masking. Never stored in the DB.
-         */
-        @NotBlank(message = "Account number is required")
+
         String accountNumber,
+
+        Boolean changeAccountNumber,
+
         String accountNotes,
         Boolean checkPrintingEnabled,
+
         @PositiveOrZero(message = "Balance must be zero or positive")
         BigDecimal balance
 ) {}
