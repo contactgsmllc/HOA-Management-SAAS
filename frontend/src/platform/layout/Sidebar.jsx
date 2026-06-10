@@ -15,29 +15,21 @@ import {
   FileText,
 } from "lucide-react";
 
-const Sidebar = () => {
-  const role = localStorage.getItem("role");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
+const linkClass = ({ isActive }) =>
+  `flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] whitespace-nowrap transition ${
+    isActive ? "bg-white font-semibold" : "text-white hover:bg-white/10"
+  }`;
 
-  const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-lg text-[15px] whitespace-nowrap transition ${
-      isActive ? "bg-white font-semibold" : "text-white hover:bg-white/10"
-    }`;
+const subLinkClass = ({ isActive }) =>
+  `flex items-center gap-2 px-4 py-2 ml-8 rounded-md text-[14px] whitespace-nowrap transition ${
+    isActive ? "bg-white font-medium" : "text-white/90 hover:bg-white/10"
+  }`;
 
-  const subLinkClass = ({ isActive }) =>
-    `flex items-center gap-2 px-4 py-2 ml-8 rounded-md text-[14px] whitespace-nowrap transition ${
-      isActive ? "bg-white font-medium" : "text-white/90 hover:bg-white/10"
-    }`;
+const activeStyle = ({ isActive }) =>
+  isActive ? { color: "var(--color-primary)" } : {};
 
-  const activeStyle = ({ isActive }) =>
-    isActive ? { color: "var(--color-primary)" } : {};
-
-  const accountingOpen = location.pathname.startsWith("/dashboard/accounting");
-  const reportsOpen    = location.pathname.startsWith("/dashboard/reports");
-
-  // ── Shared nav content ─────────────────────────────────────────────────────
-  const NavContent = ({ onLinkClick }) => (
+function NavContent({ role, accountingOpen, reportsOpen, onLinkClick }) {
+  return (
     <>
       <NavLink to="/dashboard" end className={linkClass} style={activeStyle} onClick={onLinkClick}>
         <Home size={18} /> Dashboard
@@ -115,6 +107,15 @@ const Sidebar = () => {
       )}
     </>
   );
+}
+
+const Sidebar = () => {
+  const role = localStorage.getItem("role");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  const accountingOpen = location.pathname.startsWith("/dashboard/accounting");
+  const reportsOpen    = location.pathname.startsWith("/dashboard/reports");
 
   return (
     <>
@@ -128,7 +129,7 @@ const Sidebar = () => {
             GSTechSystem
           </div>
           <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-8rem)]">
-            <NavContent onLinkClick={undefined} />
+            <NavContent role={role} accountingOpen={accountingOpen} reportsOpen={reportsOpen} onLinkClick={undefined} />
           </nav>
         </div>
 
@@ -166,7 +167,7 @@ const Sidebar = () => {
                 <button onClick={() => setMobileOpen(false)}><X size={20} /></button>
               </div>
               <nav className="p-4 space-y-1">
-                <NavContent onLinkClick={() => setMobileOpen(false)} />
+                <NavContent role={role} accountingOpen={accountingOpen} reportsOpen={reportsOpen} onLinkClick={() => setMobileOpen(false)} />
               </nav>
             </div>
             <div className="p-4 border-t border-white/20 space-y-1">

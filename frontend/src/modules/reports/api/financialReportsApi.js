@@ -12,7 +12,6 @@ export function resolveDateRange(preset) {
   const isoDate = (d) => d.toISOString().split("T")[0];
 
   const startOfYear = () => new Date(today.getFullYear(), 0, 1);
-  const endOfYear   = () => new Date(today.getFullYear(), 11, 31);
 
   const quarterStart = (date) => {
     const q = Math.floor(date.getMonth() / 3);
