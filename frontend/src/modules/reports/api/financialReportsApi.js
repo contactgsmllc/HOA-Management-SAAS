@@ -122,3 +122,58 @@ export const getBudgets = (associationId) =>
   httpClient.get("/api/v1/accounting/budgets", {
     params: associationId ? { associationId } : {},
   });
+
+// ── Association Reports ────────────────────────────────────────────────────────
+
+export const getVendorSpending = ({ associationId, from, to }) =>
+  httpClient.get("/api/v1/reports/association/vendor-spending", {
+    params: {
+      ...(associationId ? { associationId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+
+export const getAssessmentHistory = ({ associationId, from, to }) =>
+  httpClient.get("/api/v1/reports/association/assessment-history", {
+    params: {
+      ...(associationId ? { associationId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+
+export const getUnitOwnerStatement = ({ associationId, unitId, from, to }) =>
+  httpClient.get("/api/v1/reports/association/unit-owner-statement", {
+    params: {
+      ...(associationId ? { associationId } : {}),
+      ...(unitId ? { unitId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+
+export const getFinancialSummary = ({ associationId, from, to }) =>
+  httpClient.get("/api/v1/reports/association/financial-summary", {
+    params: {
+      ...(associationId ? { associationId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+
+export const getUnitOccupancy = ({ associationId, dateRange = "CURRENT" }) =>
+  httpClient.get("/api/v1/reports/association/unit-occupancy", {
+    params: {
+      ...(associationId ? { associationId } : {}),
+      dateRange,
+    },
+  });
+
+export const getDelinquency = ({ associationId, agingPeriod = "ALL" }) =>
+  httpClient.get("/api/v1/reports/association/delinquency", {
+    params: {
+      ...(associationId ? { associationId } : {}),
+      agingPeriod,
+    },
+  });

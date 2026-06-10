@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAssociations } from "@/modules/associations/associationApi";
 import { getUnitsByAssociation } from "@/modules/associations/unitApi";
-import httpClient from "@/api/httpClient";
+import { getUnitOwnerStatement } from "../api/financialReportsApi";
 import { toast } from "react-toastify";
 
 const fmt = (n) =>
@@ -43,9 +43,7 @@ export default function UnitOwnerStatementPage() {
     if (!canGenerate) { toast.error("Select an association and a unit"); return; }
     try {
       setLoading(true);
-      const res = await httpClient.get("/api/v1/reports/unit-owner-statement", {
-        params: { associationId, unitId, from, to },
-      });
+      const res = await getUnitOwnerStatement({ associationId, unitId, from, to });
       setReport(res.data.data);
     } catch { toast.error("Failed to generate statement"); }
     finally { setLoading(false); }

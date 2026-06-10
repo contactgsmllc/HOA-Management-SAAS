@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -104,4 +105,16 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
             @Param("vendorId")      Long      vendorId,
             @Param("associationId") Long      associationId
     );
+
+    // ── NEW — Financial Summary Report ────────────────────────────────────────
+
+    @Query("SELECT COALESCE(SUM(b.totalAmount), 0) FROM Bill b " +
+            "WHERE b.tenantId = :tenantId " +
+            "  AND b.associationId = COALESCE(:associationId, b.associationId) " +
+            "  AND b.issueDate BETWEEN :from AND :to")
+    BigDecimal sumTotalByAssociationIdAndDateRange(
+            @Param("tenantId") Long tenantId,
+            @Param("associationId") Long associationId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }
