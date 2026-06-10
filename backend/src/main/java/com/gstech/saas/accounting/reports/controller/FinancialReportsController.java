@@ -17,15 +17,6 @@ import java.time.LocalDate;
 
 /**
  * Financial Reports controller.
- *
- * Base path: /api/v1/reports
- *
- * BE-3 endpoints (Balance Sheet, Income Statement, Trial Balance) were already
- * in this branch. BE-4 endpoints (Cash Flow, Vendor Ledger, Budget vs Actual)
- * are added here.
- *
- * Note: AssociationReportsController uses /api/v1/reports/association/*
- * so there is no path conflict.
  */
 @RestController
 @RequestMapping("/api/v1/reports/financial")
@@ -36,10 +27,6 @@ import java.time.LocalDate;
 public class FinancialReportsController {
 
     private final ReportsService reportsService;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-3 — BALANCE SHEET (existing — kept exactly as-is)
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Generate Balance Sheet report",
@@ -60,10 +47,6 @@ public class FinancialReportsController {
         return ResponseEntity.ok(ApiResponse.success(
                 reportsService.generateBalanceSheet(associationId, asOfDate, accountingBasis)));
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-3 — INCOME STATEMENT (existing — kept exactly as-is)
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Generate Income Statement report",
@@ -96,10 +79,6 @@ public class FinancialReportsController {
                         associationId, reportFrom, reportTo, accountingBasis, accountSelection)));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-3 — TRIAL BALANCE (existing — kept exactly as-is)
-    // ─────────────────────────────────────────────────────────────────────────
-
     @Operation(
             summary = "Generate Trial Balance report",
             description = "All accounts with total debits and credits. " +
@@ -129,10 +108,6 @@ public class FinancialReportsController {
                 reportsService.generateTrialBalance(
                         associationId, reportFrom, reportTo, accountingBasis, accountId)));
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-4 — CASH FLOW STATEMENT (new)
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Generate Cash Flow Statement",
@@ -164,10 +139,6 @@ public class FinancialReportsController {
                 reportsService.generateCashFlow(associationId, reportFrom, reportTo, accountingBasis)));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-4 — VENDOR LEDGER REPORT (new)
-    // ─────────────────────────────────────────────────────────────────────────
-
     @Operation(
             summary = "Generate Vendor Ledger Report",
             description = "Transaction history per vendor — all bills with running balance. " +
@@ -195,10 +166,6 @@ public class FinancialReportsController {
         return ResponseEntity.ok(ApiResponse.success(
                 reportsService.generateVendorLedger(associationId, vendorId, reportFrom, reportTo)));
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-4 — BUDGET VS ACTUAL REPORT (new)
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Operation(
             summary = "Generate Budget vs Actual Report",

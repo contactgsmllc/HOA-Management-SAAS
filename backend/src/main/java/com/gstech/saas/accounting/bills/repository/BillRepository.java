@@ -23,8 +23,6 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
 
     long countByTenantId(Long tenantId);
 
-    // ── Existing — filtered page ──────────────────────────────────────────────
-
     @Query("""
         SELECT b FROM Bill b
         WHERE b.tenantId = :tenantId
@@ -43,8 +41,6 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
             Pageable pageable
     );
 
-    // ── Existing — overdue scheduler ──────────────────────────────────────────
-
     @Modifying
     @Query("""
         UPDATE Bill b
@@ -52,8 +48,6 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
         WHERE b.status = 'UNPAID' AND b.dueDate < :today
     """)
     int markOverdue(@Param("today") LocalDate today);
-
-    // ── Existing — summary ────────────────────────────────────────────────────
 
     @Query("""
         SELECT NEW com.gstech.saas.accounting.bills.dto.BillSummaryResponse(
@@ -71,8 +65,6 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
             @Param("associationId") Long associationId
     );
 
-    // ── Existing — vendor spending report ─────────────────────────────────────
-
     @Query("""
         SELECT b FROM Bill b
         WHERE b.tenantId = :tenantId
@@ -85,10 +77,6 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
             @Param("to")            LocalDate to,
             @Param("associationId") Long      associationId
     );
-
-    // ── NEW — Vendor Ledger report ────────────────────────────────────────────
-    // Both vendorId and associationId are optional (COALESCE handles null).
-    // Sorted ASC so running balance can be accumulated in chronological order.
 
     @Query("""
         SELECT b FROM Bill b
@@ -105,8 +93,6 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
             @Param("vendorId")      Long      vendorId,
             @Param("associationId") Long      associationId
     );
-
-    // ── NEW — Financial Summary Report ────────────────────────────────────────
 
     @Query("SELECT COALESCE(SUM(b.totalAmount), 0) FROM Bill b " +
             "WHERE b.tenantId = :tenantId " +

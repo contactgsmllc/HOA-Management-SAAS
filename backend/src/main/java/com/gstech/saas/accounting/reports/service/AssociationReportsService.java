@@ -261,9 +261,6 @@ public class AssociationReportsService {
                 from, to, openingBalance, totalCharges, totalPayments, closingBalance, sorted);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // REPORT 4 — FINANCIAL SUMMARY
-    // ─────────────────────────────────────────────────────────────────────────
     public FinancialSummaryResponse getFinancialSummary(
             Long associationId,
             LocalDate from,
@@ -313,9 +310,6 @@ public class AssociationReportsService {
                 outstandingCharges, collectionRate, summary);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // REPORT 5 — UNIT OCCUPANCY
-    // ─────────────────────────────────────────────────────────────────────────
     public UnitOccupancyResponse getUnitOccupancy(Long associationId) {
 
         Long tenantId = TenantContext.get();
@@ -358,9 +352,6 @@ public class AssociationReportsService {
                 rows);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // REPORT 6 — DELINQUENCY
-    // ─────────────────────────────────────────────────────────────────────────
     public DelinquencyResponse getDelinquency(Long associationId, String agingPeriod) {
 
         Long tenantId = TenantContext.get();

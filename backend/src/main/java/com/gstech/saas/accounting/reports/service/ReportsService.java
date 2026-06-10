@@ -43,10 +43,6 @@ public class ReportsService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-3: BALANCE SHEET
-    // ─────────────────────────────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public BalanceSheetResponse generateBalanceSheet(Long associationId,
                                                      LocalDate asOfDate,
@@ -74,10 +70,6 @@ public class ReportsService {
                 assets, liabilities, equity,
                 totalAssets, totalLiabilities, totalEquity, isBalanced);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-3: INCOME STATEMENT
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public IncomeStatementResponse generateIncomeStatement(Long associationId,
@@ -110,10 +102,6 @@ public class ReportsService {
                 totalRevenue, totalExpenses, totalRevenue.subtract(totalExpenses),
                 revenue, expenses);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-3: TRIAL BALANCE
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public TrialBalanceResponse generateTrialBalance(Long associationId,
@@ -151,8 +139,7 @@ public class ReportsService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // BE-4: CASH FLOW STATEMENT
-    // Bucket classification by AccountType (matches screenshot):
+    // Bucket classification by AccountType
     //   INCOME    → Operating  (credit - debit = revenue inflow, positive)
     //   EXPENSES  → Operating  (debit - credit = cash out, negative)
     //   ASSETS    → Investing  (credit - debit)
@@ -225,10 +212,6 @@ public class ReportsService {
                 operating, investing, financing);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-4: VENDOR LEDGER
-    // ─────────────────────────────────────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public VendorLedgerResponse generateVendorLedger(Long associationId,
                                                      Long vendorId,
@@ -290,10 +273,6 @@ public class ReportsService {
         return new VendorLedgerGroup(vId, name, category,
                 totalBilled, totalPaid, totalBilled.subtract(totalPaid), rows);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // BE-4: BUDGET VS ACTUAL
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public BudgetVsActualResponse generateBudgetVsActual(Long budgetId,
@@ -379,10 +358,6 @@ public class ReportsService {
                 totalActualIncome.subtract(totalActualExpenses),
                 incomeRows, expenseRows);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // SHARED HELPERS
-    // ─────────────────────────────────────────────────────────────────────────
 
     private List<ReportLineItem> fetchLineItems(Long tenantId, Long associationId,
                                                 LocalDate asOfDate, AccountType accountType,
