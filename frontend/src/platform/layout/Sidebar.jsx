@@ -12,6 +12,7 @@ import {
   X,
   Menu,
   HelpCircle,
+  FileText
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -175,6 +176,30 @@ const Sidebar = () => {
            )}
           </nav>
         </div>
+
+    {role === "TENANT_ADMIN" && (
+        <div>
+          <NavLink
+            to="/dashboard/reports/balance-sheet"
+            className={linkClass}
+            style={activeStyle}
+          >
+            <FileText size={18} />
+            Reports
+          </NavLink>
+
+          {location.pathname.startsWith("/dashboard/reports") && (
+            <div className="mt-1 space-y-1">
+              <NavLink to="/dashboard/reports/balance-sheet"    className={subLinkClass} style={activeStyle}>Balance Sheet</NavLink>
+              <NavLink to="/dashboard/reports/income-statement" className={subLinkClass} style={activeStyle}>Income Statement</NavLink>
+              <NavLink to="/dashboard/reports/trial-balance"    className={subLinkClass} style={activeStyle}>Trial Balance</NavLink>
+              <NavLink to="/dashboard/reports/cash-flow"        className={subLinkClass} style={activeStyle}>Cash Flow</NavLink>
+              <NavLink to="/dashboard/reports/vendor-ledger"    className={subLinkClass} style={activeStyle}>Vendor Ledger</NavLink>
+              <NavLink to="/dashboard/reports/budget-vs-actual" className={subLinkClass} style={activeStyle}>Budget vs Actual</NavLink>
+            </div>
+          )}
+        </div>
+      )}
 
         {/* Bottom Settings */}
         <div className="p-4 border-t border-white/20 space-y-1">
@@ -348,6 +373,30 @@ const Sidebar = () => {
                 )}
               </nav>
             </div>
+
+            {role === "TENANT_ADMIN" && (
+                <div>
+                  <NavLink
+                    to="/dashboard/reports/balance-sheet"
+                    className={linkClass}
+                    style={activeStyle}
+                  >
+                    <FileText size={18} />
+                    Reports
+                  </NavLink>
+
+                  {location.pathname.startsWith("/dashboard/reports") && (
+                    <div className="mt-1 space-y-1">
+                      <NavLink to="/dashboard/reports/balance-sheet"    className={subLinkClass} style={activeStyle} onClick={() => setMobileOpen(false)} >Balance Sheet</NavLink>
+                      <NavLink to="/dashboard/reports/income-statement" className={subLinkClass} style={activeStyle} onClick={() => setMobileOpen(false)}>Income Statement</NavLink>
+                      <NavLink to="/dashboard/reports/trial-balance"    className={subLinkClass} style={activeStyle} onClick={() => setMobileOpen(false)}>Trial Balance</NavLink>
+                      <NavLink to="/dashboard/reports/cash-flow"        className={subLinkClass} style={activeStyle} onClick={() => setMobileOpen(false)}>Cash Flow</NavLink>
+                      <NavLink to="/dashboard/reports/vendor-ledger"    className={subLinkClass} style={activeStyle} onClick={() => setMobileOpen(false)}>Vendor Ledger</NavLink>
+                      <NavLink to="/dashboard/reports/budget-vs-actual" className={subLinkClass} style={activeStyle} onClick={() => setMobileOpen(false)}>Budget vs Actual</NavLink>
+                    </div>
+                  )}
+                </div>
+              )}
 
             <div className="p-4 border-t border-white/20 space-y-1">
               <NavLink

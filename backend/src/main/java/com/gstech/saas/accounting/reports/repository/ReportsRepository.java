@@ -128,4 +128,91 @@ public interface ReportsRepository extends JpaRepository<Ledger, Long> {
             @Param("to")            LocalDate to,
             @Param("basis")         AccountingBasis basis
     );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Cash Flow Statement (all account types in one pass)
+    // Returns: [ accountId, accountCode, accountName, accountType, SUM(debit), SUM(credit) ]
+    // from and to are always non-null when this query is called.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT l.accountId,
+               c.accountCode,
+               c.accountName,
+               c.accountType,
+               COALESCE(SUM(l.debit), 0)  AS totalDebit,
+               COALESCE(SUM(l.credit), 0) AS totalCredit
+        FROM Ledger l
+        JOIN Coa c ON c.id = l.accountId
+        WHERE l.tenantId       = :tenantId
+          AND c.isDeleted      = false
+          AND l.date           BETWEEN :from AND :to
+          AND l.associationId  = COALESCE(:associationId, l.associationId)
+          AND l.accountingBasis = COALESCE(:basis, l.accountingBasis)
+        GROUP BY l.accountId, c.accountCode, c.accountName, c.accountType
+        ORDER BY c.accountCode
+    """)
+    List<Object[]> getAllAccountsForCashFlow(
+            @Param("tenantId")      Long            tenantId,
+            @Param("associationId") Long            associationId,
+            @Param("from")          LocalDate       from,
+            @Param("to")            LocalDate       to,
+            @Param("basis")         AccountingBasis basis
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Cash Flow opening balance
+    // Returns ASSETS account totals UP TO (exclusive) the period start.
+    // openingCashBalance = sum of ASSETS (debit - credit) before from date.
+    // Returns: [ accountId, SUM(debit), SUM(credit) ]
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT l.accountId,
+               COALESCE(SUM(l.debit), 0),
+               COALESCE(SUM(l.credit), 0)
+        FROM Ledger l
+        JOIN Coa c ON c.id = l.accountId
+        WHERE l.tenantId       = :tenantId
+          AND c.accountType    = com.gstech.saas.accounting.coa.dto.AccountType.ASSETS
+          AND c.isDeleted      = false
+          AND l.date           < :from
+          AND l.associationId  = COALESCE(:associationId, l.associationId)
+        GROUP BY l.accountId
+    """)
+    List<Object[]> getAssetBalancesBeforeDate(
+            @Param("tenantId")      Long      tenantId,
+            @Param("associationId") Long      associationId,
+            @Param("from")          LocalDate from
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Budget vs Actual actual amounts per account
+    // Returns debit/credit per account for the given account IDs.
+    // Used by BudgetVsActualService to look up actual spending per CoA account.
+    // Returns: [ accountId, SUM(debit), SUM(credit) ]
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT l.accountId,
+               COALESCE(SUM(l.debit), 0),
+               COALESCE(SUM(l.credit), 0)
+        FROM Ledger l
+        JOIN Coa c ON c.id = l.accountId
+        WHERE l.tenantId       = :tenantId
+          AND l.accountId      IN :accountIds
+          AND c.isDeleted      = false
+          AND l.date           BETWEEN :from AND :to
+          AND l.associationId  = COALESCE(:associationId, l.associationId)
+          AND l.accountingBasis = COALESCE(:basis, l.accountingBasis)
+        GROUP BY l.accountId
+    """)
+    List<Object[]> getActualAmountsForAccounts(
+            @Param("tenantId")      Long            tenantId,
+            @Param("accountIds")    java.util.Collection<Long> accountIds,
+            @Param("associationId") Long            associationId,
+            @Param("from")          LocalDate       from,
+            @Param("to")            LocalDate       to,
+            @Param("basis")         AccountingBasis basis
+    );
 }

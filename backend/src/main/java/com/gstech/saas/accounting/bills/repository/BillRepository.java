@@ -22,6 +22,8 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
 
     long countByTenantId(Long tenantId);
 
+    // ── Existing — filtered page ──────────────────────────────────────────────
+
     @Query("""
         SELECT b FROM Bill b
         WHERE b.tenantId = :tenantId
@@ -32,22 +34,25 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
         ORDER BY b.issueDate DESC
     """)
     Page<Bill> findFiltered(
-            @Param("tenantId")      Long tenantId,
-            @Param("associationId") Long associationId,
+            @Param("tenantId")      Long       tenantId,
+            @Param("associationId") Long       associationId,
             @Param("status")        BillStatus status,
-            @Param("from")          LocalDate from,
-            @Param("to")            LocalDate to,
+            @Param("from")          LocalDate  from,
+            @Param("to")            LocalDate  to,
             Pageable pageable
     );
+
+    // ── Existing — overdue scheduler ──────────────────────────────────────────
 
     @Modifying
     @Query("""
         UPDATE Bill b
         SET b.status = 'OVERDUE'
-        WHERE b.status = 'UNPAID'
-        AND b.dueDate < :today
+        WHERE b.status = 'UNPAID' AND b.dueDate < :today
     """)
     int markOverdue(@Param("today") LocalDate today);
+
+    // ── Existing — summary ────────────────────────────────────────────────────
 
     @Query("""
         SELECT NEW com.gstech.saas.accounting.bills.dto.BillSummaryResponse(
@@ -65,6 +70,8 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
             @Param("associationId") Long associationId
     );
 
+    // ── Existing — vendor spending report ─────────────────────────────────────
+
     @Query("""
         SELECT b FROM Bill b
         WHERE b.tenantId = :tenantId
@@ -72,9 +79,29 @@ public interface BillRepository extends JpaRepository<Bill, Long>,
           AND b.associationId = COALESCE(:associationId, b.associationId)
     """)
     List<Bill> findBillsForVendorSpending(
-            @Param("tenantId")      Long tenantId,
+            @Param("tenantId")      Long      tenantId,
             @Param("from")          LocalDate from,
             @Param("to")            LocalDate to,
-            @Param("associationId") Long associationId
+            @Param("associationId") Long      associationId
+    );
+
+    // ── NEW — Vendor Ledger report ────────────────────────────────────────────
+    // Both vendorId and associationId are optional (COALESCE handles null).
+    // Sorted ASC so running balance can be accumulated in chronological order.
+
+    @Query("""
+        SELECT b FROM Bill b
+        WHERE b.tenantId       = :tenantId
+          AND b.issueDate BETWEEN :from AND :to
+          AND b.associationId  = COALESCE(:associationId, b.associationId)
+          AND b.vendorId       = COALESCE(:vendorId, b.vendorId)
+        ORDER BY b.issueDate ASC
+    """)
+    List<Bill> findBillsForVendorLedger(
+            @Param("tenantId")      Long      tenantId,
+            @Param("from")          LocalDate from,
+            @Param("to")            LocalDate to,
+            @Param("vendorId")      Long      vendorId,
+            @Param("associationId") Long      associationId
     );
 }
