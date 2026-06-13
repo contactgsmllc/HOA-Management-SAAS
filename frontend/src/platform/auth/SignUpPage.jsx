@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/ui/Button";
@@ -16,7 +14,9 @@ const Signup = () => {
   }, []);
 
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
+    companyName: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -33,47 +33,38 @@ const Signup = () => {
     setErrors({ ...errors, [e.target.name]: "" });
   };
 
-
   const validate = () => {
     const newErrors = {};
 
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = "First name is required";
+    }
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = "Last name is required";
+    }
+    if (!formData.companyName.trim()) {
+      newErrors.companyName = "Company name is required";
     }
 
- 
     if (!formData.email) {
       newErrors.email = "Email is required";
-    } else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
-    ) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Enter a valid email address";
     }
-
 
     if (!formData.password) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 8) {
       newErrors.password = "Minimum 8 characters required";
-    } else if (
-      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(
-        formData.password
-      )
-    ) {
-      newErrors.password =
-        "Include uppercase, lowercase & number";
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(formData.password)) {
+      newErrors.password = "Include uppercase, lowercase & number";
     }
 
-   
     if (!formData.confirmPassword) {
-      newErrors.confirmPassword =
-        "Please confirm your password";
-    } else if (
-      formData.password !== formData.confirmPassword
-    ) {
-      newErrors.confirmPassword =
-        "Passwords do not match";
+      newErrors.confirmPassword = "Please confirm your password";
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
     return newErrors;
@@ -85,29 +76,25 @@ const Signup = () => {
     const validationErrors = validate();
     setErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length > 0)
-      return;
+    if (Object.keys(validationErrors).length > 0) return;
 
     try {
       setLoading(true);
 
       await signup({
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email,
-        password: formData.password,
-        companyName: formData.companyName.trim()
+        firstName:   formData.firstName.trim(),
+        lastName:    formData.lastName.trim(),
+        email:       formData.email,
+        password:    formData.password,
+        companyName: formData.companyName.trim(),
       });
 
       navigate("/login", {
         state: { message: "Signup successful! Please login." },
       });
-
     } catch (err) {
       setErrors({
-        general:
-          err.response?.data?.message ||
-          "Signup failed",
+        general: err.response?.data?.message || "Signup failed",
       });
     } finally {
       setLoading(false);
@@ -152,7 +139,7 @@ const Signup = () => {
               onChange={handleChange}
               error={errors.lastName}
               leftIcon={<User />}
-             />
+            />
 
             <Input
               label="Company Name"
@@ -162,7 +149,8 @@ const Signup = () => {
               onChange={handleChange}
               error={errors.companyName}
               leftIcon={<User />}
-             />
+            />
+
             <Input
               label="Email Address"
               name="email"
@@ -189,11 +177,7 @@ const Signup = () => {
                 className="absolute right-3 top-10 cursor-pointer text-gray-500"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
-                )}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </div>
             </div>
 
@@ -212,11 +196,7 @@ const Signup = () => {
                 className="absolute right-3 top-10 cursor-pointer text-gray-500"
                 onClick={() => setShowConfirm(!showConfirm)}
               >
-                {showConfirm ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
-                )}
+                {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
               </div>
             </div>
 
@@ -248,4 +228,3 @@ const Signup = () => {
 };
 
 export default Signup;
-
