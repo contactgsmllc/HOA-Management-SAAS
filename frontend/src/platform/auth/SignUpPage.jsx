@@ -92,9 +92,11 @@ const Signup = () => {
       setLoading(true);
 
       await signup({
-        name: formData.name.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
         email: formData.email,
         password: formData.password,
+        companyName: formData.companyName.trim()
       });
 
       navigate("/login", {
@@ -133,15 +135,34 @@ const Signup = () => {
             )}
 
             <Input
-              label="Full Name"
-              name="name"
-              placeholder="John Doe"
-              value={formData.name}
+              label="First Name"
+              name="firstName"
+              placeholder="John"
+              value={formData.firstName}
               onChange={handleChange}
-              error={errors.name}
+              error={errors.firstName}
               leftIcon={<User />}
             />
 
+            <Input
+              label="Last Name"
+              name="lastName"
+              placeholder="Doe"
+              value={formData.lastName}
+              onChange={handleChange}
+              error={errors.lastName}
+              leftIcon={<User />}
+             />
+
+            <Input
+              label="Company Name"
+              name="companyName"
+              placeholder="GSTechSystem"
+              value={formData.companyName}
+              onChange={handleChange}
+              error={errors.companyName}
+              leftIcon={<User />}
+             />
             <Input
               label="Email Address"
               name="email"
