@@ -28,10 +28,10 @@ jobs:
 
       - name: Build and push backend image
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64 \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/society-backend:latest \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/society-backend:${IMAGE_TAG} \
-            --push -f backend/Dockerfile backend
+           docker buildx build --platform linux/amd64,linux/arm64 \
+             -t "${{ secrets.DOCKERHUB_USERNAME }}/society-backend:latest" \
+             -t "${{ secrets.DOCKERHUB_USERNAME }}/society-backend:${IMAGE_TAG}" \
+             --push -f backend/Dockerfile backend
 
       - name: Build and push frontend image
         run: |
