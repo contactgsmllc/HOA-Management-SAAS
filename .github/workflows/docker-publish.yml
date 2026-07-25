@@ -29,10 +29,25 @@ jobs:
 
       - name: Build and push backend image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/society-backend:latest ./backend
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/society-backend:latest
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t dearsrini/society-backend:latest \
+            -t dearsrini/society-backend:${IMAGE_TAG} \
+            --push -f backend/Dockerfile backend
 
       - name: Build and push frontend image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/society-frontend:latest -f frontend/Dockerfile frontend
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/society-frontend:latest
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t dearsrini/society-frontend:latest \
+            -t dearsrini/society-frontend:${IMAGE_TAG} \
+             --push -f frontend/Dockerfile frontend
+             
+
+      # - name: Build and push backend image
+      #   run: |
+      #     docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/society-backend:latest ./backend
+      #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/society-backend:latest
+
+      # - name: Build and push frontend image
+      #   run: |
+      #     docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/society-frontend:latest -f frontend/Dockerfile frontend
+      #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/society-frontend:latest
