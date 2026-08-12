@@ -21,6 +21,8 @@ import com.gstech.saas.platform.tenant.multitenancy.TenantFilter;
 
 import lombok.RequiredArgsConstructor;
 
+import static org.springframework.http.HttpMethod.OPTIONS;
+
 @RequiredArgsConstructor
 @Configuration
 @EnableMethodSecurity
@@ -41,6 +43,7 @@ public class SecurityConfig {
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public
+                        .requestMatchers(OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/users/register",
                                 "/users/login",
