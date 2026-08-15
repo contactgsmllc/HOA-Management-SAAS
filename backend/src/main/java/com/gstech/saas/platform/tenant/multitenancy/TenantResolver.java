@@ -29,7 +29,18 @@ public class TenantResolver {
         String host = request.getServerName();
 
         // ── Production: resolve tenant from subdomain ─────────────────────────
-        if (host != null && !host.equals("localhost") && !host.equals("127.0.0.1")) {
+        // Srini commentt and add below //if (host != null && !host.equals("localhost") && !host.equals("127.0.0.1")) {
+        boolean platformHost =
+                host == null
+                        || host.equalsIgnoreCase("localhost")
+                        || host.equals("127.0.0.1")
+                        || host.equalsIgnoreCase("gsittech.com")
+                        || host.equalsIgnoreCase("www.gsittech.com");
+
+        // SaaS tenant subdomains:
+        // company1.gsittech.com -> company1
+        if (!platformHost && host.toLowerCase().endsWith(".gsittech.com")) {
+        //Srini add end
             String subdomain = host.split("\\.")[0];
             return tenantRepository
                     .findBySubdomain(subdomain)
@@ -37,6 +48,8 @@ public class TenantResolver {
                     .getId();
         }
 
+        // Main platform domain:
+        // authenticated requests get tenantId from JWT
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
@@ -55,6 +68,7 @@ public class TenantResolver {
             }
         }
 
+        // Public platform requests such as signup/check-company
         return 0L;
     }
 }
