@@ -4,9 +4,6 @@ import { getAccessToken, setToken, clearStorage } from "../shared/utils/storage"
 
 const httpClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  // baseURL: import.meta.env.DEV
-  //     ? import.meta.env.VITE_API_BASE_URL
-  //     : window.location.origin,
   headers: { "Content-Type": "application/json" },
   withCredentials: true, 
 });
