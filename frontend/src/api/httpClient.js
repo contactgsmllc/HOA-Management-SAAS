@@ -7,7 +7,7 @@ const API_BASE_URL = import.meta.env.DEV
   : window.location.origin;
 
 const httpClient = axios.create({
-  baseURL: VITE_API_BASE_URL,
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
   withCredentials: true, 
 });
