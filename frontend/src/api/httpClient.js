@@ -2,9 +2,7 @@
 import axios from "axios";
 import { getAccessToken, setToken, clearStorage } from "../shared/utils/storage";
 
-const API_BASE_URL = import.meta.env.DEV
-  ? import.meta.env.VITE_API_BASE_URL
-  : window.location.origin;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 const httpClient = axios.create({
   baseURL: API_BASE_URL,
