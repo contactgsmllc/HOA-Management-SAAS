@@ -25,23 +25,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # - name: Build backend JAR
-      #   run: |
-      #     cd backend
-      #     mvn clean package -DskipTests
+      - name: Build backend JAR
+        run: |
+          cd backend
+          mvn clean package -DskipTests
 
-      # - name: Build and push backend image
-      #   run: |
-      #     docker buildx build --platform linux/amd64,linux/arm64 \
-      #       -t dearsrini/society-backend:test \
-      #       -t dearsrini/society-backend:${IMAGE_TAG} \
-      #       --push -f backend/Dockerfile backend
-
-      - name: Build and push frontend image
+      - name: Build and push backend image
         run: |
           docker buildx build --platform linux/amd64,linux/arm64 \
-            -t dearsrini/society-frontend:test \
-            -t dearsrini/society-frontend:${IMAGE_TAG} \
-            --push -f frontend/Dockerfile frontend
+            -t dearsrini/society-backend:test \
+            -t dearsrini/society-backend:${IMAGE_TAG} \
+            --push -f backend/Dockerfile backend
+
+      # - name: Build and push frontend image
+      #   run: |
+      #     docker buildx build --platform linux/amd64,linux/arm64 \
+      #       -t dearsrini/society-frontend:test \
+      #       -t dearsrini/society-frontend:${IMAGE_TAG} \
+      #       --push -f frontend/Dockerfile frontend
 
       
