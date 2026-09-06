@@ -31,7 +31,6 @@ httpClient.interceptors.response.use(
       try {
       
         const res = await axios.post(
-          //`${import.meta.env.VITE_API_BASE_URL}/users/refresh`,
            `${API_BASE_URL}/users/refresh`,
           {},
           { withCredentials: true }

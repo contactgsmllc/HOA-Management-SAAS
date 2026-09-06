@@ -60,9 +60,7 @@ export const getBudgets = (associationId) =>
 // Uses fetch() directly with the Bearer token so the browser triggers a file download.
 function buildExportUrl(path, params) {
 
-  const API_BASE_URL = import.meta.env.DEV
-  ? import.meta.env.VITE_API_BASE_URL
-  : window.location.origin;
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
   
   const base   = API_BASE_URL || "";
   const url    = new URL(base + path, window.location.origin);
