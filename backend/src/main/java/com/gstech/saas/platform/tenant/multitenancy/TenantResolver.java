@@ -35,7 +35,9 @@ public class TenantResolver {
                         || host.equalsIgnoreCase("localhost")
                         || host.equals("127.0.0.1")
                         || host.equalsIgnoreCase("gsittech.com")
-                        || host.equalsIgnoreCase("www.gsittech.com");
+                        || host.equalsIgnoreCase("www.gsittech.com")
+                        || host.equalsIgnoreCase("gsitinfo.com")
+                        || host.equalsIgnoreCase("www.gsitinfo.com");
 
         // SaaS tenant subdomains:
         // company1.gsittech.com -> company1
