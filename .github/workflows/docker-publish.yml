@@ -5,6 +5,11 @@ on:
     branches: 
       - dev
 
+# Run one deploy at a time, so two pushes never update the ArgoCD repo at once
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,3 +50,28 @@ jobs:
             --push -f frontend/Dockerfile frontend
 
       
+
+      # Write the new image version into the ArgoCD repo -> Argo CD deploys it to the dev cluster
+      - name: Checkout ArgoCD repo
+        uses: actions/checkout@v4
+        with:
+          repository: contactgsmllc/ArgoCD
+          ssh-key: ${{ secrets.ARGOCD_DEPLOY_KEY }}
+          path: argocd
+
+      - name: Update image tags for dev
+        run: |
+          cd argocd
+          yq -i '(.images[] | select(.name == "dearsrini/society-backend")).newTag = "${{ env.IMAGE_TAG }}"' \
+            dev/manifests/backend/kustomization.yaml
+          yq -i '(.images[] | select(.name == "dearsrini/society-frontend")).newTag = "${{ env.IMAGE_TAG }}"' \
+            dev/manifests/frontend/kustomization.yaml
+          git diff
+
+      - name: Commit and push to ArgoCD repo
+        run: |
+          cd argocd
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy dev: backend+frontend ${{ env.IMAGE_TAG }} (from ${{ github.sha }})" || echo "No change"
+          git push
