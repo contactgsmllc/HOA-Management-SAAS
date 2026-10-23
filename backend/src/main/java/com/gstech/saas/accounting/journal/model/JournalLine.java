@@ -1,5 +1,6 @@
 package com.gstech.saas.accounting.journal.model;
 
+import com.gstech.saas.accounting.ledger.dto.LineBasis;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,6 +26,10 @@ public class JournalLine {
     @Column(nullable = false)
     private Long accountId;
 
+    /** Unit this line belongs to, when it's a unit-level charge/payment line. Null otherwise. */
+    @Column(name = "unit_id")
+    private Long unitId;
+
     private String description;
 
     @Column(nullable = false, precision = 15, scale = 2)
@@ -32,4 +37,13 @@ public class JournalLine {
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal credit = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", length = 30)
+    private com.gstech.saas.accounting.ledger.dto.LedgerSourceType sourceType;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "basis", nullable = false, length = 10)
+    private LineBasis basis = LineBasis.BOTH;
 }

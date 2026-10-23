@@ -4,6 +4,9 @@ import com.gstech.saas.accounting.banking.dto.BankAccountRequest;
 import com.gstech.saas.accounting.banking.dto.BankAccountResponse;
 import com.gstech.saas.accounting.banking.model.Banking;
 import com.gstech.saas.accounting.banking.repository.BankingRepository;
+import com.gstech.saas.accounting.coa.dto.AccountType;
+import com.gstech.saas.accounting.coa.model.Coa;
+import com.gstech.saas.accounting.coa.repository.CoaRepository;
 import com.gstech.saas.associations.association.model.Association;
 import com.gstech.saas.associations.association.repository.AssociationRepository;
 import com.gstech.saas.platform.exception.BankingExceptions;
@@ -21,6 +24,7 @@ public class BankingServiceImpl implements BankingService {
 
     private final BankingRepository     bankingRepository;
     private final AssociationRepository associationRepository;
+    private final CoaRepository coaRepository;
 
     // ── LIST ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +48,7 @@ public class BankingServiceImpl implements BankingService {
 
     // ── CREATE ────────────────────────────────────────────────────────────────
 
+    // REPLACE createAccount():
     @Override
     @Transactional
     public BankAccountResponse createAccount(BankAccountRequest request) {
@@ -70,7 +75,20 @@ public class BankingServiceImpl implements BankingService {
                 .balance(request.balance() != null ? request.balance() : BigDecimal.ZERO)
                 .build();
 
-        return mapToResponse(bankingRepository.save(banking));
+        banking = bankingRepository.save(banking); // first save — need the generated id for the COA code
+
+        Coa coa = Coa.builder()
+                .accountCode("BANK-" + banking.getId())
+                .accountName(banking.getBankAccountName())
+                .accountType(AccountType.ASSETS)
+                .notes("Auto-created GL account for bank account: " + banking.getBankAccountName())
+                .build();
+        coa = coaRepository.save(coa);
+
+        banking.setCoaAccountId(coa.getId());
+        banking = bankingRepository.save(banking);
+
+        return mapToResponse(banking);
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────────
@@ -121,6 +139,21 @@ public class BankingServiceImpl implements BankingService {
             banking.setBalance(request.balance());
         }
 
+        // Self-heal: a bank account created before V6/V11 (or one the backfill
+        // somehow missed) can still have no linked GL account. Give it one on
+        // the next edit rather than leaving it permanently unpostable — this
+        // is what RecordTransactionPage now tells the user to do.
+        if (banking.getCoaAccountId() == null) {
+            Coa coa = Coa.builder()
+                    .accountCode("BANK-" + banking.getId())
+                    .accountName(banking.getBankAccountName())
+                    .accountType(AccountType.ASSETS)
+                    .notes("Auto-created GL account for bank account: " + banking.getBankAccountName())
+                    .build();
+            coa = coaRepository.save(coa);
+            banking.setCoaAccountId(coa.getId());
+        }
+
         return mapToResponse(bankingRepository.save(banking));
     }
 
@@ -165,6 +198,7 @@ public class BankingServiceImpl implements BankingService {
                 banking.getAccountNotes(),
                 banking.getCheckPrintingEnabled(),
                 banking.getBalance(),
+                banking.getCoaAccountId(),
                 banking.getCreatedAt()
         );
     }

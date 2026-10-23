@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
 import Input from "@/components/ui/Input";
+import StateSelect, { isValidZipCode } from "@/shared/components/StateSelect";
 
 import { createUnit } from "../unitApi";
 import { getAssociationById } from "../associationApi";
@@ -14,6 +15,7 @@ const UnitAdd = () => {
   const { associationId } = useParams();
 
   const [association, setAssociation] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const [formData, setFormData] = useState({
     unitNumber: "",
@@ -23,10 +25,6 @@ const UnitAdd = () => {
     zipCode: "",
     occupancyStatus: "VACANT",
     balance: 0,
-
-    ownerName: "",
-    
-
     renterFirstName: "",
     renterLastName: "",
     renterEmail: "",
@@ -53,6 +51,10 @@ const UnitAdd = () => {
       ...prev,
       [name]: value,
     }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
   const handleBack = () => {
@@ -64,11 +66,24 @@ const UnitAdd = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (formData.zipCode && !isValidZipCode(formData.zipCode)) {
+      setErrors({ zipCode: "Invalid ZIP code format (e.g. 12345 or 12345-6789)" });
+      return;
+    }
+
     try {
-      await createUnit({
+      const res = await createUnit({
         ...formData,
         associationId: Number(associationId),
       });
+
+      const newUnitId = res?.data?.data?.id;
+      if (newUnitId && ["OWNER_OCCUPIED", "RENTED"].includes(formData.occupancyStatus)) {
+        // Owner can't be created without contact details, so continue on the
+        // Add Owner page with this unit pre-selected.
+        navigate(`/dashboard/associations/${associationId}/units/${newUnitId}/owners/add`);
+        return;
+      }
 
       navigate(`/dashboard/associations/${associationId}`, {
         state: { activeTab: "Units" },
@@ -147,11 +162,12 @@ const UnitAdd = () => {
                   onChange={handleChange}
                 />
 
-                <Input
+                <StateSelect
                   label="State"
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
+                  error={errors.state}
                 />
 
                 <Input
@@ -159,6 +175,8 @@ const UnitAdd = () => {
                   name="zipCode"
                   value={formData.zipCode}
                   onChange={handleChange}
+                  error={errors.zipCode}
+                  placeholder="e.g. 12345 or 12345-6789"
                 />
 
               </div>
@@ -178,23 +196,21 @@ const UnitAdd = () => {
               ]}
             />
 
-            {/* Owner Info */}
-       
-{["OWNER_OCCUPIED", "RENTED"].includes(formData.occupancyStatus) && (
-  <section className="space-y-6 pt-6">
-    <h4 className="text-gray-900 font-semibold text-lg">
-      Owner Information
-    </h4>
-
-    <Input
-      label="Owner Name"
-      name="ownerName"
-      value={formData.ownerName}
-      onChange={handleChange}
-      placeholder="Enter owner name"
-    />
-  </section>
-)}
+            {/* Owner Info — an owner is a separate record (email, phone and address
+                are required), so it can't be typed in as a plain name here. After the
+                unit is created the user continues on the Add Owner page. */}
+            {["OWNER_OCCUPIED", "RENTED"].includes(formData.occupancyStatus) && (
+                <section className="space-y-2 pt-6">
+                  <h4 className="text-gray-900 font-semibold text-lg">
+                    Owner Information
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    After you click <span className="font-medium text-gray-700">Add Unit</span>,
+                    you'll be taken to the Add Owner page for this unit. The owner's name
+                    appears in the Units list once the owner is saved.
+                  </p>
+                </section>
+            )}
 
             {/* Renter Info */}
             {formData.occupancyStatus === "RENTED" && (
