@@ -22,6 +22,8 @@ import com.gstech.saas.platform.tenant.multitenancy.TenantFilter;
 
 import lombok.RequiredArgsConstructor;
 
+import static org.springframework.http.HttpMethod.OPTIONS;
+
 @RequiredArgsConstructor
 @Configuration
 @EnableMethodSecurity
@@ -32,7 +34,7 @@ public class SecurityConfig {
     // Comma-separated list of browser origins allowed to call the API. The default
     // covers the Vite dev server, CRA-style :3000, and the nginx container on :80.
     // Set app.cors.allowed-origins (or APP_CORS_ALLOWED_ORIGINS) in each environment.
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost,https://hoa-app.tailfc43ba.ts.net","https://gsittech.com"}")
     private List<String> allowedOrigins;
 
     private final TenantFilter tenantFilter;
@@ -48,6 +50,7 @@ public class SecurityConfig {
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public
+                        .requestMatchers(OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/users/register",
                                 "/users/login",

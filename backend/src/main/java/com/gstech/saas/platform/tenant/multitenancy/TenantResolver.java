@@ -29,13 +29,18 @@ public class TenantResolver {
         String host = request.getServerName();
 
         // ── Production: resolve tenant from subdomain ─────────────────────────
-        // Only treat the first label as a tenant subdomain when the host really
-        // looks like "<sub>.<domain>" — not an IP address, a bare docker service
-        // name ("backend") or localhost. An unknown subdomain no longer throws
-        // (that surfaced as a bare 500 on every request, login included); it
-        // falls through to the JWT / self-signup path below. JwtFilter still
-        // rejects a token whose tenant doesn't match the resolved one.
-        if (host != null && looksLikeTenantHost(host)) {
+        // Srini commentt and add below //if (host != null && !host.equals("localhost") && !host.equals("127.0.0.1")) {
+        boolean platformHost =
+                host == null
+                        || host.equalsIgnoreCase("localhost")
+                        || host.equals("127.0.0.1")
+                        || host.equalsIgnoreCase("gsittech.com")
+                        || host.equalsIgnoreCase("www.gsittech.com");
+
+        // SaaS tenant subdomains:
+        // company1.gsittech.com -> company1
+        if (!platformHost && host.toLowerCase().endsWith(".gsittech.com")) {
+        //Srini add end
             String subdomain = host.split("\\.")[0];
             var tenant = tenantRepository.findBySubdomain(subdomain);
             if (tenant.isPresent()) {
@@ -43,6 +48,8 @@ public class TenantResolver {
             }
         }
 
+        // Main platform domain:
+        // authenticated requests get tenantId from JWT
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
@@ -61,6 +68,7 @@ public class TenantResolver {
             }
         }
 
+        // Public platform requests such as signup/check-company
         return 0L;
     }
 
