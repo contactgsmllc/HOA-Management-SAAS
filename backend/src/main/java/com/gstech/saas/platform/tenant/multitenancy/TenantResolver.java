@@ -42,10 +42,10 @@ public class TenantResolver {
         if (!platformHost && host.toLowerCase().endsWith(".gsittech.com")) {
         //Srini add end
             String subdomain = host.split("\\.")[0];
-            return tenantRepository
-                    .findBySubdomain(subdomain)
-                    .orElseThrow(() -> new RuntimeException("Invalid tenant: " + subdomain))
-                    .getId();
+            var tenant = tenantRepository.findBySubdomain(subdomain);
+            if (tenant.isPresent()) {
+                return tenant.get().getId();
+            }
         }
 
         // Main platform domain:
@@ -70,5 +70,12 @@ public class TenantResolver {
 
         // Public platform requests such as signup/check-company
         return 0L;
+    }
+
+    private static boolean looksLikeTenantHost(String host) {
+        if (host.equals("localhost") || host.equals("127.0.0.1")) return false;
+        if (host.matches("\\d{1,3}(\\.\\d{1,3}){3}")) return false; // IPv4
+        if (host.contains(":")) return false;                          // IPv6
+        return host.contains(".");                                     // needs "<sub>.<something>"
     }
 }

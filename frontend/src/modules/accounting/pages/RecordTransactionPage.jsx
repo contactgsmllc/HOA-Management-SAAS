@@ -99,11 +99,16 @@ export default function RecordTransactionPage() {
           if (linkedId) {
             setBankCoaId(linkedId);
           } else {
-            // Fallback lookup
-            const autoFound = rawCoa.find(a => a.accountType === "ASSETS");
-            if (autoFound) setBankCoaId(autoFound.id);
+            // Every bank account must carry its own GL account. Don't fall back to
+            // "some other ASSETS account" — the entry would post to an arbitrary
+            // account and never show in this bank's own Transactions tab.
+            setBankCoaId(null);
+            toast.error(
+                "This bank account has no linked GL account, so transactions can't be " +
+                "posted safely. Re-save the bank account (Edit → Save) to link one, then try again."
+            );
           }
-        }
+          }
       } catch {
         toast.error("Failed to load account details");
       } finally {
@@ -114,8 +119,6 @@ export default function RecordTransactionPage() {
     loadData();
   }, [id]);
 
- 
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -123,23 +126,30 @@ export default function RecordTransactionPage() {
 
   const buildLines = () => {
     const amount = parseFloat(form.amount);
-    const coaBankId = Number(bankCoaId); 
+    const coaBankId = Number(bankCoaId);
     const coaCategoryId = Number(form.categoryAccountId);
+    // Without a per-line description the Transactions tab showed "—" for every row.
+    const description = form.description;
 
     if (form.transactionType === "DEPOSIT") {
       return [
-        { accountId: coaBankId, debit: amount, credit: 0 },
-        { accountId: coaCategoryId, debit: 0, credit: amount },
+        { accountId: coaBankId, description, debit: amount, credit: 0 },
+        { accountId: coaCategoryId, description, debit: 0, credit: amount },
       ];
     }
     return [
-      { accountId: coaCategoryId, debit: amount, credit: 0 },
-      { accountId: coaBankId, debit: 0, credit: amount },
+      { accountId: coaCategoryId, description, debit: amount, credit: 0 },
+      { accountId: coaBankId, description, debit: 0, credit: amount },
     ];
   };
 
   const handleSubmit = async () => {
-    if (!form.amount || !form.categoryAccountId || !bankCoaId || !form.description) {
+    if (!bankCoaId) {
+      toast.error("No valid GL account found for this transaction — please ensure Chart of Accounts is configured");
+      return;
+    }
+
+    if (!form.amount || !form.categoryAccountId || !form.description) {
       toast.error("Please fill all required fields");
       return;
     }
