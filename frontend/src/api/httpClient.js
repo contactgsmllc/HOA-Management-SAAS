@@ -30,10 +30,8 @@ httpClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-      
         const res = await axios.post(
-          //`${import.meta.env.VITE_API_BASE_URL}/users/refresh`,
-           `${API_BASE_URL}/users/refresh`,
+          `${API_BASE_URL}/users/refresh`,
           {},
           { withCredentials: true }
         );
@@ -49,8 +47,10 @@ httpClient.interceptors.response.use(
         window.location.href = "/login";
         return Promise.reject(refreshError);
       }
-      return Promise.reject(error);
     }
+
+    return Promise.reject(error);
+  }
 );
 
 export default httpClient;
