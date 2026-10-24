@@ -3,7 +3,7 @@ name: Build and Push Docker Images
 on:
   push:
     branches: 
-      - dev
+      - ci/argocd-auto-deploy
 
 # Run one deploy at a time, so two pushes never update the ArgoCD repo at once
 concurrency:
