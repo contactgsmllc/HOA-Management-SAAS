@@ -1,4 +1,3 @@
-
 import axios from "axios";
 import { getAccessToken, setToken, clearStorage } from "../shared/utils/storage";
 
@@ -9,7 +8,7 @@ const API_BASE_URL = import.meta.env.DEV
 const httpClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
-  withCredentials: true, 
+  withCredentials: true,
 });
 
 // Request Interceptor
@@ -31,10 +30,8 @@ httpClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-      
         const res = await axios.post(
-          //`${import.meta.env.VITE_API_BASE_URL}/users/refresh`,
-           `${API_BASE_URL}/users/refresh`,
+          `${API_BASE_URL}/users/refresh`,
           {},
           { withCredentials: true }
         );
@@ -51,6 +48,7 @@ httpClient.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
+
     return Promise.reject(error);
   }
 );

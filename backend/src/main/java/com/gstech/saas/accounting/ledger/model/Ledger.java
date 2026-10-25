@@ -1,6 +1,7 @@
 package com.gstech.saas.accounting.ledger.model;
 
 import com.gstech.saas.accounting.ledger.dto.AccountingBasis;
+import com.gstech.saas.accounting.ledger.dto.LedgerSourceType;
 import com.gstech.saas.platform.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,6 +39,17 @@ public class Ledger extends BaseEntity {
     @Column(name = "association_id", nullable = false)
     private Long associationId;
 
+    /**
+     * Which unit this line belongs to, when it originated from a unit-level
+     * event (invoice charge / payment). Null for association-wide entries
+     * (manual banking transactions, vendor bills, etc.) that aren't tied to
+     * a single unit. Added in V16 so UnitLedgerServiceImpl can actually
+     * scope a unit's ledger page to that unit instead of the whole
+     * association.
+     */
+    @Column(name = "unit_id")
+    private Long unitId;
+
     /** Accounting date of the entry (not the record creation timestamp) */
     @Column(name = "date", nullable = false)
     private LocalDate date;
@@ -54,4 +66,8 @@ public class Ledger extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "accounting_basis", nullable = false, length = 10)
     private AccountingBasis accountingBasis;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", length = 30)
+    private LedgerSourceType sourceType;
 }
