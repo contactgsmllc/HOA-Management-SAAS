@@ -5,6 +5,7 @@ on:
     branches: 
       - ci/argocd-auto-deploy
 
+
 # Run one deploy at a time, so two pushes never update the ArgoCD repo at once
 concurrency:
   group: deploy-dev
